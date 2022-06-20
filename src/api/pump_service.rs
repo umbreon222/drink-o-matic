@@ -1,3 +1,4 @@
+use crate::api::models::PumpJob;
 use std::collections::VecDeque;
 use std::thread;
 use std::time::Duration;
@@ -24,7 +25,7 @@ static IS_PROCESSING_QUEUE: AtomicBool = AtomicBool::new(false);
 pub struct PumpService {
     pump_pins: Arc<Mutex<[pin::OutputPin<pin::WiringPi>; NUMBER_OF_PUMPS as usize]>>,
     pump_states: Arc<Mutex<Vec<PumpState>>>,
-    pump_queue: Arc<Mutex<VecDeque<u8>>>
+    pump_queue: Arc<Mutex<VecDeque<PumpJob>>>
 }
 
 // TODO: This gets created and used as a singleton so we should rework this to act like one.
@@ -50,21 +51,29 @@ impl PumpService {
         for pump_number in 1..=NUMBER_OF_PUMPS {
             pump_states.push(PumpState {
                 pump_number: pump_number as u8,
-                is_running: false,
-                duration_in_milliseconds: 0
+                is_running: false
             });
         }
-        Self { pump_pins: pump_pins, pump_states: Arc::new(Mutex::new(pump_states)), pump_queue: Arc::new(Mutex::new(VecDeque::new())) }
+        Self {
+            pump_pins: pump_pins,
+            pump_states: Arc::new(Mutex::new(pump_states)),
+            pump_queue: Arc::new(Mutex::new(VecDeque::new()))
+        }
     }
 
     pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u8) -> Result<PumpState, &str> {
         self.pump_states.lock().unwrap()[0].is_running = true;
         match self.pump_states.lock().unwrap().get_mut(pump_number as usize - 1) {
             Some(pump_state) => {
-                pump_state.duration_in_milliseconds = ml_to_pump as u32 * MILLISECONDS_PER_ML;
-                self.pump_queue.lock().unwrap().push_back(pump_number);
-                if IS_PROCESSING_QUEUE.load(Ordering::Acquire) == false {
-                    IS_PROCESSING_QUEUE.store(true, Ordering::Release);
+                self.pump_queue.lock().unwrap().push_back(PumpJob {
+                    pump_number: pump_number,
+                    duration_in_milliseconds: ml_to_pump as u32 * MILLISECONDS_PER_ML
+                });
+                let result = IS_PROCESSING_QUEUE.compare_exchange(false,
+                    true,
+                    Ordering::Acquire,
+                    Ordering::Relaxed);
+                if result.is_ok() {
                     let pump_queue_arc = self.pump_queue.clone();
                     let pump_pins_arc = self.pump_pins.clone();
                     let pump_states_arc = self.pump_states.clone();
@@ -90,27 +99,36 @@ impl PumpService {
         self.pump_states.lock().unwrap().clone()
     }
 
-    pub fn process_queue(pump_queue_arc: Arc<Mutex<VecDeque<u8>>>, pump_pins_arc: Arc<Mutex<[pin::OutputPin<pin::WiringPi>; NUMBER_OF_PUMPS as usize]>>, pump_states_arc: Arc<Mutex<Vec<PumpState>>>) {
+    pub fn get_pump_queue(&self) -> Vec<PumpJob> {
+        Vec::from(self.pump_queue.lock().unwrap().clone())
+    }
+
+    pub fn process_queue(
+        pump_queue_arc: Arc<Mutex<VecDeque<PumpJob>>>,
+        pump_pins_arc: Arc<Mutex<[pin::OutputPin<pin::WiringPi>; NUMBER_OF_PUMPS as usize]>>,
+        pump_states_arc: Arc<Mutex<Vec<PumpState>>>
+    ) {
         let mut first_in_queue = pump_queue_arc.lock().unwrap().pop_front();
         while first_in_queue.is_some() {
-            let pump_number = first_in_queue.unwrap();
-            // This is the only function that sets this and this function can only run one at a time
+            let pump_job = first_in_queue.unwrap();
+            // Add the first element back so the user can get the queue state accurately.
+            pump_queue_arc.lock().unwrap().push_front(pump_job.clone());
             let duration: Duration;
             if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
-                locked_pump_states[pump_number as usize - 1].is_running = true;
-                duration = Duration::from_millis(locked_pump_states[pump_number as usize - 1].duration_in_milliseconds as u64);
+                locked_pump_states[pump_job.pump_number as usize - 1].is_running = true;
+                duration = Duration::from_millis(pump_job.duration_in_milliseconds as u64);
             } else {
                 panic!("Failed to lock pump states");
             }
             if let Ok(locked_pump_pins) = pump_pins_arc.lock() {
-                locked_pump_pins[pump_number as usize - 1].digital_write(pin::Value::High);
+                locked_pump_pins[pump_job.pump_number as usize - 1].digital_write(pin::Value::High);
                 thread::sleep(duration);
-                locked_pump_pins[pump_number as usize - 1].digital_write(pin::Value::Low);
+                locked_pump_pins[pump_job.pump_number as usize - 1].digital_write(pin::Value::Low);
             }
             if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
-                locked_pump_states[pump_number as usize - 1].is_running = false;
-                locked_pump_states[pump_number as usize - 1].duration_in_milliseconds = 0;
+                locked_pump_states[pump_job.pump_number as usize - 1].is_running = false;
             }
+            pump_queue_arc.lock().unwrap().pop_front(); // Discard the element we just processed
             first_in_queue = pump_queue_arc.lock().unwrap().pop_front();
         }
     }

@@ -4,12 +4,17 @@ mod api;
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
-use crate::api::models::{ PumpState, InputError };
+use crate::api::models::{ PumpState, PumpJob, InputError };
 use crate::api::PumpService;
 
 #[get("/pumps")]
 fn pumps_get(pump_service: &State<PumpService>) -> Json<Vec<PumpState>> {
     Json(pump_service.get_pump_states())
+}
+
+#[get("/pump_queue")]
+fn pump_queue_get(pump_service: &State<PumpService>) -> Json<Vec<PumpJob>> {
+    Json(pump_service.get_pump_queue())
 }
 
 #[get("/pumps/<pump_number>")]
@@ -38,6 +43,6 @@ fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pu
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![pump_number_get, pump_number_post, pumps_get])
+        .mount("/", routes![pumps_get, pump_queue_get, pump_number_get, pump_number_post])
         .manage(PumpService::new())
 }
