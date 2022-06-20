@@ -31,6 +31,8 @@ pub struct PumpService {
 // TODO: This shit is hella rough so we should clean it up at some point.
 // TODO: Cases we need to think about:
 // 1. Double call to enqueue_pump() with same pump number.
+//   a. Solution to this is to add duration to the enqueue_pump() call.
+//   b. Add a get method for the pump queue (api).
 impl PumpService {
     pub fn new() -> Self {
         let pi = wiringpi::setup();
