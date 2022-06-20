@@ -61,38 +61,38 @@ impl PumpService {
         }
     }
 
-    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u8) -> Result<PumpState, &str> {
-        self.pump_states.lock().unwrap()[0].is_running = true;
-        match self.pump_states.lock().unwrap().get_mut(pump_number as usize - 1) {
-            Some(pump_state) => {
-                self.pump_queue.lock().unwrap().push_back(PumpJob {
-                    pump_number: pump_number,
-                    duration_in_milliseconds: ml_to_pump as u32 * MILLISECONDS_PER_ML
-                });
-                let result = IS_PROCESSING_QUEUE.compare_exchange(false,
-                    true,
-                    Ordering::Acquire,
-                    Ordering::Relaxed);
-                if result.is_ok() {
-                    let pump_queue_arc = self.pump_queue.clone();
-                    let pump_pins_arc = self.pump_pins.clone();
-                    let pump_states_arc = self.pump_states.clone();
-                    let _ = thread::spawn(move || {
-                        PumpService::process_queue(pump_queue_arc, pump_pins_arc, pump_states_arc);
-                        IS_PROCESSING_QUEUE.store(false, Ordering::Release);
-                    });
-                }
-                Ok(pump_state.clone())
-            },
-            None => Err(INVALID_PUMP_NUMBER_ERROR)
+    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u8) -> Result<Vec<PumpJob>, &str> {
+        if pump_number == 0 || pump_number > NUMBER_OF_PUMPS {
+            return Err(INVALID_PUMP_NUMBER_ERROR);
         }
+        if ml_to_pump == 0 {
+            return Err("ml_to_pump must be greater than 0");
+        }
+        self.pump_queue.lock().unwrap().push_back(PumpJob {
+            pump_number: pump_number,
+            duration_in_milliseconds: ml_to_pump as u32 * MILLISECONDS_PER_ML
+        });
+        let result = IS_PROCESSING_QUEUE.compare_exchange(false,
+            true,
+            Ordering::Acquire,
+            Ordering::Relaxed);
+        if result.is_ok() {
+            let pump_queue_arc = self.pump_queue.clone();
+            let pump_pins_arc = self.pump_pins.clone();
+            let pump_states_arc = self.pump_states.clone();
+            let _ = thread::spawn(move || {
+                PumpService::process_queue(pump_queue_arc, pump_pins_arc, pump_states_arc);
+                IS_PROCESSING_QUEUE.store(false, Ordering::Release);
+            });
+        }
+        Ok(self.get_pump_queue())
     }
 
     pub fn get_pump_state(&self, pump_number: u8) -> Result<PumpState, &str> {
-        match self.pump_states.lock().unwrap().get(pump_number as usize - 1) {
-            Some(pump_state) => Ok(pump_state.clone()),
-            None => Err(INVALID_PUMP_NUMBER_ERROR)
+        if pump_number == 0 || pump_number > NUMBER_OF_PUMPS {
+            return Err(INVALID_PUMP_NUMBER_ERROR);
         }
+        Ok(self.pump_states.lock().unwrap()[pump_number as usize - 1].clone())
     }
 
     pub fn get_pump_states(&self) -> Vec<PumpState> {

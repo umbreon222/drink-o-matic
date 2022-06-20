@@ -26,14 +26,14 @@ fn pump_number_get(pump_service: &State<PumpService>, pump_number: u8) -> Result
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<Json<PumpState>, status::BadRequest::<Json<InputError>>> {
+fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<Json<Vec<PumpJob>>, status::BadRequest::<Json<InputError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
         return Err(status::BadRequest(Some(Json(InputError { message: String::from("Expected ml to pump") }))));
     }
     match temp.parse::<u8>() {
         Ok(ml_to_pump) => match pump_service.enqueue_pump(pump_number, ml_to_pump) {
-            Ok(pump_state) => Ok(Json(pump_state)),
+            Ok(pump_queue) => Ok(Json(pump_queue)),
             Err(error) => Err(status::BadRequest(Some(Json(InputError { message: error.to_string() }))))
         },
         Err(_) => Err(status::BadRequest(Some(Json(InputError { message: String::from("Couldn't parse ml to pump") }))))
