@@ -6,7 +6,7 @@ use core::sync::atomic::{ AtomicBool, Ordering };
 #[cfg(feature = "use-gpio")]
 use gpio_cdev::{ Chip, Line, LineRequestFlags, LineHandle };
 #[cfg(not(feature = "use-gpio"))]
-use crate::mock::{ Chip, Line, LineRequestFlags, LineHandle };
+use crate::api::mock::{ Chip, Line, LineRequestFlags, LineHandle };
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
@@ -36,6 +36,9 @@ pub struct PumpService {
 
 impl PumpService {
     pub fn new() -> Result<Self, String> {
+        if cfg!(not(feature = "use-gpio")) {
+            log::info!("Feature \"use-gpio\" was not set; GPIO will be mocked");
+        }
         let mut chip: Chip;
         log::info!("Getting chip \"{}\"", RPI_CHIP_NAME);
         match Chip::new(RPI_CHIP_NAME) {

@@ -1,4 +1,4 @@
-use crate::mock::{ LineHandle, LineRequestFlags };
+use crate::api::mock::{ LineHandle, LineRequestFlags };
 
 pub struct Line { }
 
