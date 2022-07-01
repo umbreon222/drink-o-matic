@@ -1,6 +1,4 @@
 mod api;
-#[cfg(not(feature = "use-gpio"))]
-mod mock;
 
 #[macro_use] extern crate rocket;
 extern crate env_logger;
@@ -46,9 +44,6 @@ fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pu
 #[launch]
 fn rocket() -> _ {
     env_logger::init();
-    if cfg!(not(feature = "use-gpio")) {
-        log::info!("Feature \"use-gpio\" was not set; GPIO will be mocked");
-    }
     let pump_service: PumpService;
     match PumpService::new() {
         Ok(new_pump_service) => pump_service = new_pump_service,
