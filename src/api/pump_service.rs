@@ -10,6 +10,7 @@ use crate::mock::{ Chip, Line, LineRequestFlags, LineHandle };
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
+const IS_RELAY_INVERTED: bool = true;
 
 const RPI_CHIP_NAME: &str = "/dev/gpiochip0";
 const NUMBER_OF_PUMPS: usize = 8;
@@ -52,7 +53,11 @@ impl PumpService {
                 Ok(res) => line = res,
                 Err(e) => return Err(format!("Error getting line for pump {} on pin {}: {}", pump_number, pin_number, e))
             }
-            match line.request(LineRequestFlags::OUTPUT, 0, format!("Pump {}", pump_number).as_str()) {
+            let mut default_state = 0;
+            if IS_RELAY_INVERTED {
+                default_state = 1;
+            }
+            match line.request(LineRequestFlags::OUTPUT, default_state, format!("Pump {}", pump_number).as_str()) {
                 Ok(line_handle) => line_handles.push(line_handle),
                 Err(e) => return Err(format!("Error getting line handle for pump {} on pin {}: {}", pump_number, pin_number, e))
             }
@@ -134,12 +139,18 @@ impl PumpService {
                 panic!("Failed to lock pump states");
             }
             if let Ok(locked_line_handles) = line_handles_arc.lock() {
-                log::info!("Setting pump {} to HIGH", pump_job.pump_number);
+                let mut high = 1;
+                let mut low = 0;
+                if IS_RELAY_INVERTED {
+                    high = 0;
+                    low = 1;
+                }
+                log::info!("Setting pump {} to HIGH={}", pump_job.pump_number, high);
                 // Force panic if pump value can't be set.
-                locked_line_handles[index].set_value(1).unwrap();
+                locked_line_handles[index].set_value(high).unwrap();
                 thread::sleep(duration);
-                log::info!("Setting pump {} to LOW", pump_job.pump_number);
-                locked_line_handles[index].set_value(0).unwrap();
+                log::info!("Setting pump {} to LOW={}", pump_job.pump_number, low);
+                locked_line_handles[index].set_value(low).unwrap();
             }
             if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
                 locked_pump_states[pump_job.pump_number as usize - 1].is_running = false;
