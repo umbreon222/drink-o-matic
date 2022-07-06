@@ -10,7 +10,7 @@ use crate::mock::{ Chip, Line, LineRequestFlags, LineHandle };
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
-const IS_RELAY_INVERTED: bool = true;
+const IS_RELAY_INVERTED: bool = false;
 
 const RPI_CHIP_NAME: &str = "/dev/gpiochip0";
 const NUMBER_OF_PUMPS: usize = 8;
