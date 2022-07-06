@@ -14,14 +14,14 @@ const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
 const RPI_CHIP_NAME: &str = "/dev/gpiochip0";
 const NUMBER_OF_PUMPS: usize = 8;
 const PUMP_PIN_NUMBERS: [u32; NUMBER_OF_PUMPS] = [
-    1, // PUMP 1
-    2, // PUMP 2
-    3, // PUMP 3
-    4, // PUMP 4
-    5, // PUMP 5
-    6, // PUMP 6
-    7, // PUMP 7
-    8, // PUMP 8
+    21, // PUMP 1
+    26, // PUMP 2
+    20, // PUMP 3
+    19, // PUMP 4
+    16, // PUMP 5
+    13, // PUMP 6
+    6, // PUMP 7
+    12, // PUMP 8
 ];
 const MILLISECONDS_PER_ML: u32 = 1000;
 
