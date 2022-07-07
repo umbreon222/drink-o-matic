@@ -1,0 +1,24 @@
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
+
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
+jobs:
+  build:
+    docker:
+      - image: cimg/rust:1.61.0
+    steps:
+      - checkout
+      - run: cargo --version
+      - run: cargo build -r
+      - store_artifacts:
+          path: /home/circleci/project/target/release/drink-o-matic
+          destination: drink-o-matic
+
+# Invoke jobs via workflows
+# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+workflows:
+  build-workflow:
+    jobs:
+      - build
