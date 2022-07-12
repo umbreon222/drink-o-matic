@@ -24,7 +24,7 @@ const PUMP_PIN_NUMBERS: [u32; NUMBER_OF_PUMPS] = [
     6, // PUMP 7
     12, // PUMP 8
 ];
-const MILLISECONDS_PER_ML: u32 = 40;
+const MILLISECONDS_PER_ML: u32 = 32;
 
 static IS_PROCESSING_QUEUE: AtomicBool = AtomicBool::new(false);
 
