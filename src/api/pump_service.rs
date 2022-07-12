@@ -10,7 +10,7 @@ use crate::mock::{ Chip, Line, LineRequestFlags, LineHandle };
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
-const IS_RELAY_INVERTED: bool = false;
+const IS_RELAY_INVERTED: bool = true;
 
 const RPI_CHIP_NAME: &str = "/dev/gpiochip0";
 const NUMBER_OF_PUMPS: usize = 8;
@@ -24,7 +24,7 @@ const PUMP_PIN_NUMBERS: [u32; NUMBER_OF_PUMPS] = [
     6, // PUMP 7
     12, // PUMP 8
 ];
-const MILLISECONDS_PER_ML: u32 = 1000;
+const MILLISECONDS_PER_ML: u32 = 40;
 
 static IS_PROCESSING_QUEUE: AtomicBool = AtomicBool::new(false);
 
