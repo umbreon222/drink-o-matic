@@ -4,5 +4,5 @@ use rocket::serde::Serialize;
 #[serde(crate = "rocket::serde")]
 pub struct PumpJob {
     pub pump_number: u8,
-    pub duration_in_milliseconds: u32
+    pub duration_in_milliseconds: u64
 }
