@@ -24,7 +24,7 @@ const PUMP_PIN_NUMBERS: [u32; NUMBER_OF_PUMPS] = [
     6, // PUMP 7
     12, // PUMP 8
 ];
-const MILLISECONDS_PER_ML: u32 = 32;
+const MILLISECONDS_PER_ML: u64 = 32;
 
 static IS_PROCESSING_QUEUE: AtomicBool = AtomicBool::new(false);
 
@@ -73,14 +73,14 @@ impl PumpService {
         })
     }
 
-    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u8) -> Result<Vec<PumpJob>, &str> {
+    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, &str> {
         if pump_number == 0 || pump_number > NUMBER_OF_PUMPS as u8 {
             return Err(INVALID_PUMP_NUMBER_ERROR);
         }
         if ml_to_pump == 0 {
             return Err("ml_to_pump must be greater than 0");
         }
-        let duration_in_milliseconds = ml_to_pump as u32 * MILLISECONDS_PER_ML;
+        let duration_in_milliseconds = ml_to_pump as u64 * MILLISECONDS_PER_ML;
         log::info!("Scheduling pump {} to run for {} ms", pump_number, duration_in_milliseconds);
         self.pump_queue.lock().unwrap().push_back(PumpJob {
             pump_number: pump_number,
@@ -133,7 +133,7 @@ impl PumpService {
             if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
                 log::info!("Processing job to run pump {} for {} ms", pump_job.pump_number, pump_job.duration_in_milliseconds);
                 locked_pump_states[index].is_running = true;
-                duration = Duration::from_millis(pump_job.duration_in_milliseconds as u64);
+                duration = Duration::from_millis(pump_job.duration_in_milliseconds);
             }
             else {
                 panic!("Failed to lock pump states");

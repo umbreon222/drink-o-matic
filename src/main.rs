@@ -34,7 +34,7 @@ fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pu
     if temp.is_empty() {
         return Err(status::BadRequest(Some(Json(InputError { message: String::from("Expected ml to pump") }))));
     }
-    match temp.parse::<u8>() {
+    match temp.parse::<u32>() {
         Ok(ml_to_pump) => match pump_service.enqueue_pump(pump_number, ml_to_pump) {
             Ok(pump_queue) => Ok(Json(pump_queue)),
             Err(error) => Err(status::BadRequest(Some(Json(InputError { message: error.to_string() }))))
