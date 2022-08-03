@@ -1,4 +1,4 @@
-use crate::mock::Line;
+use crate::api::mock::Line;
 
 pub struct Chip { }
 
