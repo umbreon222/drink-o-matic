@@ -2,7 +2,7 @@ mod api;
 
 #[macro_use] extern crate rocket;
 extern crate env_logger;
-use rocket::http::{Header, ContentType, Method};
+use rocket::http::Header;
 use rocket::Response;
 use rocket::Request;
 use rocket::fairing::{ Info, Fairing, Kind };
@@ -31,14 +31,14 @@ fn pump_number_get(pump_service: &State<PumpService>, pump_number: u8) -> Result
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<Json<Vec<PumpJob>>, status::BadRequest::<Json<GenericError>>> {
+fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
         return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Expected ml to pump") }))));
     }
     match temp.parse::<u32>() {
         Ok(ml_to_pump) => match pump_service.enqueue_pump(pump_number, ml_to_pump) {
-            Ok(pump_queue) => Ok(Json(pump_queue)),
+            Ok(pump_queue) => Ok(status::Accepted(Some(Json(pump_queue)))),
             Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
         },
         Err(_) => Err(status::BadRequest(Some(Json(GenericError { message: String::from("Couldn't parse ml to pump") }))))
@@ -53,13 +53,13 @@ fn settings_get(settings_service: &State<SettingsService>) -> Json<Settings> {
 }
 
 #[put("/settings", format = "application/json", data = "<settings_json>")]
-fn settings_put(settings_service: &State<SettingsService>, settings_json: Json<Settings>) -> Result<(), status::BadRequest::<Json<GenericError>>> {
+fn settings_put(settings_service: &State<SettingsService>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
     let settings = settings_json.into_inner();
     if !settings.is_valid() {
         return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Settings are invalid") }))));
     }
     match settings_service.save(settings) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(status::NoContent),
         Err(save_error) => Err(status::BadRequest(Some(Json(GenericError { message: save_error.to_string() }))))
     }
 }
@@ -76,11 +76,9 @@ impl Fairing for CORS {
     }
 
     async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
-        if _request.method() == Method::Options || response.content_type() == Some(ContentType::JSON) {
-            response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
-            response.set_header(Header::new("Access-Control-Allow-Methods", "GET, POST, PUT"));
-            response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
-        }
+        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS"));
+        response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
     }
 }
 

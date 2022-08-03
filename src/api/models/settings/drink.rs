@@ -8,13 +8,13 @@ const STAR_RATING_MAX: u8 = 5;
 #[serde(crate = "rocket::serde")]
 pub struct Drink {
     pub id: Uuid,
-    #[serde(alias = "imageUrl")]
+    #[serde(rename  = "imageUrl")]
     pub image_url: String,
     pub name: String,
     pub description: String,
-    #[serde(alias = "ingredientIds")]
+    #[serde(rename  = "ingredientIds")]
     pub ingredient_ids: Vec<Uuid>,
-    #[serde(alias = "starRating")]
+    #[serde(rename  = "starRating")]
     pub star_rating: u8
 }
 

@@ -5,9 +5,9 @@ use rocket::serde::{ Deserialize, Serialize };
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Pump {
-    #[serde(alias = "pumpNumber")]
+    #[serde(rename  = "pumpNumber")]
     pub pump_number: u8,
-    #[serde(alias = "ingredientId")]
+    #[serde(rename  = "ingredientId")]
     pub ingredient_id: Option<Uuid>
 }
 
