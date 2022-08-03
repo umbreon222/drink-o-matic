@@ -70,14 +70,18 @@ impl PumpService {
             });
         }
         Ok(Self {
-            line_handles: Arc::new(Mutex::new(line_handles)),
+            line_handles: Arc::new(Mutex::new(line_handles)), // Revise all 3 of these with RwLock where appropriate
             pump_states: Arc::new(Mutex::new(pump_states)),
             pump_queue: Arc::new(Mutex::new(VecDeque::new()))
         })
     }
 
+    pub fn pump_number_is_valid(pump_number: u8) -> bool {
+        return pump_number > 0 && pump_number <= NUMBER_OF_PUMPS as u8;
+    }
+
     pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, &str> {
-        if pump_number == 0 || pump_number > NUMBER_OF_PUMPS as u8 {
+        if !PumpService::pump_number_is_valid(pump_number) {
             return Err(INVALID_PUMP_NUMBER_ERROR);
         }
         if ml_to_pump == 0 {
@@ -106,7 +110,7 @@ impl PumpService {
     }
 
     pub fn get_pump_state(&self, pump_number: u8) -> Result<PumpState, &str> {
-        if pump_number == 0 || pump_number > NUMBER_OF_PUMPS as u8 {
+        if !PumpService::pump_number_is_valid(pump_number) {
             return Err(INVALID_PUMP_NUMBER_ERROR);
         }
         Ok(self.pump_states.lock().unwrap()[pump_number as usize - 1].clone())
