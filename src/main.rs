@@ -2,6 +2,10 @@ mod api;
 
 #[macro_use] extern crate rocket;
 extern crate env_logger;
+use rocket::http::{Header, ContentType, Method};
+use rocket::Response;
+use rocket::Request;
+use rocket::fairing::{ Info, Fairing, Kind };
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
@@ -40,6 +44,8 @@ fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pu
         Err(_) => Err(status::BadRequest(Some(Json(GenericError { message: String::from("Couldn't parse ml to pump") }))))
     }
 }
+#[options("/settings")]
+fn settings_options() -> () { }
 
 #[get("/settings")]
 fn settings_get(settings_service: &State<SettingsService>) -> Json<Settings> {
@@ -55,6 +61,26 @@ fn settings_put(settings_service: &State<SettingsService>, settings_json: Json<S
     match settings_service.save(settings) {
         Ok(_) => Ok(()),
         Err(save_error) => Err(status::BadRequest(Some(Json(GenericError { message: save_error.to_string() }))))
+    }
+}
+
+pub struct CORS;
+
+#[rocket::async_trait]
+impl Fairing for CORS {
+    fn info(&self) -> Info {
+        Info {
+            name: "Attaching CORS headers to responses",
+            kind: Kind::Response
+        }
+    }
+
+    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
+        if _request.method() == Method::Options || response.content_type() == Some(ContentType::JSON) {
+            response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+            response.set_header(Header::new("Access-Control-Allow-Methods", "GET, POST, PUT"));
+            response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
+        }
     }
 }
 
@@ -76,7 +102,8 @@ fn rocket() -> _ {
         }
     }
     rocket::build()
-        .mount("/", routes![pumps_get, pump_queue_get, pump_number_get, pump_number_post, settings_get, settings_put])
+        .attach(CORS)
+        .mount("/", routes![pumps_get, pump_queue_get, pump_number_get, pump_number_post, settings_options, settings_get, settings_put])
         .manage(pump_service)
         .manage(settings_service)
 }
