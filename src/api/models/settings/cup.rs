@@ -5,6 +5,8 @@ use rocket::serde::{ Deserialize, Serialize };
 #[serde(crate = "rocket::serde")]
 pub struct Cup {
     pub id: Uuid,
+    #[serde(rename  = "imageUrl")]
+    pub image_url: String,
     pub name: String,
     #[serde(rename  = "volumeMl")]
     pub volume_ml: u32
