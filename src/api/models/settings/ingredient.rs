@@ -6,5 +6,5 @@ use rocket::serde::{ Deserialize, Serialize };
 pub struct Ingredient {
     pub id: Uuid,
     pub name: String,
-    pub modifier: u8,
+    pub modifier: u16,
 }

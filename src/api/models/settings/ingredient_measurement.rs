@@ -6,5 +6,5 @@ use rocket::serde::{ Deserialize, Serialize };
 pub struct IngredientMeasurement {
     #[serde(rename  = "ingredientId")]
     pub ingredient_id: Uuid,
-    pub parts: u32
+    pub parts: u16
 }

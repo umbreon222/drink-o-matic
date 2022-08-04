@@ -9,5 +9,5 @@ pub struct Cup {
     pub image_url: String,
     pub name: String,
     #[serde(rename  = "volumeMl")]
-    pub volume_ml: u32
+    pub volume_ml: u16
 }
