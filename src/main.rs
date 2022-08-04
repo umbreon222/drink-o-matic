@@ -12,15 +12,24 @@ use rocket::serde::json::Json;
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
 use crate::api::{ PumpService, SettingsService };
 
+#[options("/pumps")]
+fn pumps_options() -> () { }
+
 #[get("/pumps")]
 fn pumps_get(pump_service: &State<PumpService>) -> Json<Vec<PumpState>> {
     Json(pump_service.get_pump_states())
 }
 
+#[options("/pump_queue")]
+fn pump_queue_options() -> () { }
+
 #[get("/pump_queue")]
 fn pump_queue_get(pump_service: &State<PumpService>) -> Json<Vec<PumpJob>> {
     Json(pump_service.get_pump_queue())
 }
+
+#[options("/pumps/<_pump_number>")]
+fn pump_number_options(_pump_number: u8) -> () { }
 
 #[get("/pumps/<pump_number>")]
 fn pump_number_get(pump_service: &State<PumpService>, pump_number: u8) -> Result<Json<PumpState>, status::BadRequest::<Json<GenericError>>> {
@@ -44,6 +53,7 @@ fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pu
         Err(_) => Err(status::BadRequest(Some(Json(GenericError { message: String::from("Couldn't parse ml to pump") }))))
     }
 }
+
 #[options("/settings")]
 fn settings_options() -> () { }
 
@@ -101,7 +111,7 @@ fn rocket() -> _ {
     }
     rocket::build()
         .attach(CORS)
-        .mount("/", routes![pumps_get, pump_queue_get, pump_number_get, pump_number_post, settings_options, settings_get, settings_put])
+        .mount("/", routes![pumps_options, pumps_get, pump_queue_options, pump_queue_get, pump_number_options, pump_number_get, pump_number_post, settings_options, settings_get, settings_put])
         .manage(pump_service)
         .manage(settings_service)
 }

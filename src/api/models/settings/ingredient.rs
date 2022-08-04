@@ -5,5 +5,6 @@ use rocket::serde::{ Deserialize, Serialize };
 #[serde(crate = "rocket::serde")]
 pub struct Ingredient {
     pub id: Uuid,
-    pub name: String
+    pub name: String,
+    pub modifier: u8,
 }
