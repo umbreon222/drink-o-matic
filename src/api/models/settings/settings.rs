@@ -1,9 +1,10 @@
-use crate::api::models::settings::{ Ingredient, Pump, Drink };
+use crate::api::models::settings::{ Ingredient, Pump, Drink, Cup };
 use rocket::serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Settings {
+    pub cups: Vec<Cup>,
     pub ingredients: Vec<Ingredient>,
     pub pumps: Vec<Pump>,
     pub drinks: Vec<Drink>
@@ -12,6 +13,7 @@ pub struct Settings {
 impl Settings {
     pub fn new() -> Self {
         Settings {
+            cups: vec![],
             ingredients: vec![],
             pumps: vec![],
             drinks: vec![]
@@ -22,6 +24,13 @@ impl Settings {
         // Evaluate relationships between entities
         let mut all_ids = vec![];
         let mut pump_numbers = vec![];
+        // Check that all cups are unique
+        for cup in &self.cups {
+            if all_ids.contains(&cup.id) {
+                return false;
+            }
+            all_ids.push(cup.id);
+        }
         // Check that all ingredients are unique
         for ingredient in &self.ingredients {
             if all_ids.contains(&ingredient.id) {
@@ -46,8 +55,8 @@ impl Settings {
                 return false;
             }
             all_ids.push(drink.id.clone());
-            for ingredient_id in &drink.ingredient_ids {
-                if !all_ids.contains(ingredient_id) {
+            for ingredient_measurement in &drink.ingredient_measurements {
+                if !all_ids.contains(&ingredient_measurement.ingredient_id) {
                     return false;
                 }
             }

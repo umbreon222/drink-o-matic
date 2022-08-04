@@ -1,3 +1,4 @@
+use crate::api::models::settings::IngredientMeasurement;
 use uuid::Uuid;
 use rocket::serde::{ Deserialize, Serialize };
 
@@ -12,8 +13,10 @@ pub struct Drink {
     pub image_url: String,
     pub name: String,
     pub description: String,
-    #[serde(rename  = "ingredientIds")]
-    pub ingredient_ids: Vec<Uuid>,
+    #[serde(rename  = "ingredientMeasurements")]
+    pub ingredient_measurements: Vec<IngredientMeasurement>,
+    #[serde(rename  = "defaultCupId")]
+    pub default_cup_id: Option<Uuid>,
     #[serde(rename  = "starRating")]
     pub star_rating: u8
 }
