@@ -109,9 +109,22 @@ fn rocket() -> _ {
             panic!("Couldn't create settings service: {}", error);
         }
     }
+
+    let routes = routes![
+        pumps_options,
+        pumps_get,
+        pump_queue_options,
+        pump_queue_get,
+        pump_number_options,
+        pump_number_get,
+        pump_number_post,
+        settings_options,
+        settings_get,
+        settings_put
+    ];
+    
     rocket::build()
         .attach(CORS)
-        .mount("/", routes![pumps_options, pumps_get, pump_queue_options, pump_queue_get, pump_number_options, pump_number_get, pump_number_post, settings_options, settings_get, settings_put])
-        .manage(pump_service)
+        .mount("/", routes).manage(pump_service)
         .manage(settings_service)
 }

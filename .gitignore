@@ -15,3 +15,9 @@ Cargo.lock
 
 # vscode user settings
 .vscode/
+
+# custom ignore folder
+.ignore/
+
+# dotenv
+resources/.env
