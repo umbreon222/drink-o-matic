@@ -4,6 +4,7 @@ use rocket::serde::{ Deserialize, Serialize };
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Settings {
+    number_of_pumps: u8,
     pub cups: Vec<Cup>,
     pub ingredients: Vec<Ingredient>,
     pub pumps: Vec<Pump>,
@@ -11,8 +12,9 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new() -> Self {
+    pub fn new(number_of_pumps: u8) -> Self {
         Settings {
+            number_of_pumps,
             cups: vec![],
             ingredients: vec![],
             pumps: vec![],
@@ -40,7 +42,7 @@ impl Settings {
         }
         // Check that all pumps are valid, unique, have a valid ingredient
         for pump in &self.pumps {
-            if !pump.is_valid() || pump_numbers.contains(&pump.pump_number) {
+            if !pump.is_valid(self.number_of_pumps) || pump_numbers.contains(&pump.pump_number) {
                 return false;
             }
             pump_numbers.push(pump.pump_number);

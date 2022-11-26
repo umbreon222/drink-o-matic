@@ -94,16 +94,29 @@ impl Fairing for CORS {
 
 #[launch]
 fn rocket() -> _ {
+    // Init logger
     env_logger::init();
+
+    // Init dotenv
+    dotenv::from_filename("resources/.env").ok();
+    let settings_file_path = dotenv::var("SETTINGS_FILE_PATH").unwrap();
+    let strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
+    let is_relay_inverted = dotenv::var("IS_RELAY_INVERTED").unwrap().ends_with('1');
+    let ms_per_ml = dotenv::var("MILLISECONDS_PER_ML").unwrap().parse::<u64>().unwrap();
+    let rpi_chip_name = dotenv::var("RPI_CHIP_NAME").unwrap();
+    let pump_pin_numbers_string = dotenv::var("ORDERED_PUMP_PIN_NUMBERS").unwrap();
+    let pump_pin_numbers: Vec<u32> = pump_pin_numbers_string.split(',').map(|f| f.parse::<u32>().unwrap()).collect();
+
     let pump_service: PumpService;
-    match PumpService::new() {
+    match PumpService::new(rpi_chip_name, is_relay_inverted, pump_pin_numbers, ms_per_ml) {
         Ok(new_pump_service) => pump_service = new_pump_service,
         Err(error) => {
             panic!("Couldn't create pump service: {}", error);
         }
     }
+
     let settings_service: SettingsService;
-    match SettingsService::new() {
+    match SettingsService::new(settings_file_path, pump_service.get_number_of_pumps()) {
         Ok(new_settings_service) => settings_service = new_settings_service,
         Err(error) => {
             panic!("Couldn't create settings service: {}", error);

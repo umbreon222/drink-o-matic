@@ -6,17 +6,15 @@ use std::sync::RwLock;
 use rocket::serde::json::serde_json;
 use crate::api::models::settings::Settings;
 
-const SETTINGS_FILE_PATH: &str = ".drink-o-matic/settings.json";
-
 pub struct SettingsService {
     pub settings: RwLock<Settings>,
     settings_file_path: Box<Path>,
 }
 
 impl SettingsService {
-    pub fn new() -> Result<Self, String> {
+    pub fn new(settings_file_path: String, number_of_pumps: u8) -> Result<Self, String> {
         let home_dir = dirs::home_dir().unwrap();
-        let file_path = home_dir.join(SETTINGS_FILE_PATH);
+        let file_path = home_dir.join(settings_file_path);
         let settings: Settings;
         match fs::read_to_string(file_path.clone()) {
             Ok(existing_settings_json) => {
@@ -28,7 +26,7 @@ impl SettingsService {
                 }
             }
             Err(_) => {
-                settings = Settings::new();
+                settings = Settings::new(number_of_pumps);
             }
         }
         Ok(SettingsService { settings: RwLock::new(settings), settings_file_path: file_path.into_boxed_path() })

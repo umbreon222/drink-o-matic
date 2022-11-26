@@ -12,7 +12,7 @@ pub struct Pump {
 }
 
 impl Pump {
-    pub fn is_valid(&self) -> bool {
-        return PumpService::pump_number_is_valid(self.pump_number);
+    pub fn is_valid(&self, number_of_pumps: u8) -> bool {
+        return PumpService::pump_number_is_valid(self.pump_number, number_of_pumps);
     }
 }

@@ -10,46 +10,34 @@ use crate::api::mock::{ Chip, Line, LineRequestFlags, LineHandle };
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
-const IS_RELAY_INVERTED: bool = true;
-
-const RPI_CHIP_NAME: &str = "/dev/gpiochip0";
-const NUMBER_OF_PUMPS: usize = 8;
-const PUMP_PIN_NUMBERS: [u32; NUMBER_OF_PUMPS] = [
-    21, // PUMP 1
-    26, // PUMP 2
-    20, // PUMP 3
-    19, // PUMP 4
-    16, // PUMP 5
-    13, // PUMP 6
-    6, // PUMP 7
-    12, // PUMP 8
-];
-const MILLISECONDS_PER_ML: u64 = 32;
 
 static IS_PROCESSING_QUEUE: AtomicBool = AtomicBool::new(false);
 
 pub struct PumpService {
+    is_relay_inverted: bool,
+    pump_pin_numbers: Vec<u32>,
+    ms_per_ml: u64,
     line_handles: Arc<Mutex<Vec<LineHandle>>>,
     pump_states: Arc<Mutex<Vec<PumpState>>>,
     pump_queue: Arc<Mutex<VecDeque<PumpJob>>>
 }
 
 impl PumpService {
-    pub fn new() -> Result<Self, String> {
+    pub fn new(rpi_chip_name: String, is_relay_inverted: bool, pump_pin_numbers: Vec<u32>, ms_per_ml: u64) -> Result<Self, String> {
         if cfg!(not(feature = "use-gpio")) {
             log::info!("Feature \"use-gpio\" was not set; GPIO will be mocked");
         }
         let mut chip: Chip;
-        log::info!("Getting chip \"{}\"", RPI_CHIP_NAME);
-        match Chip::new(RPI_CHIP_NAME) {
+        log::info!("Getting chip \"{}\"", rpi_chip_name);
+        match Chip::new(&rpi_chip_name) {
             Ok(res) => chip = res,
-            Err(e) => return Err(format!("Error getting chip \"{}\": {}", RPI_CHIP_NAME, e))
+            Err(e) => return Err(format!("Error getting chip \"{}\": {}", rpi_chip_name, e))
         }
         let mut line_handles: Vec<LineHandle> = vec![];
         let mut pump_states: Vec<PumpState> = vec![];
-        for pump_index in 0..NUMBER_OF_PUMPS {
+        for pump_index in 0..(pump_pin_numbers.len() as usize) {
             let line: Line;
-            let pin_number = PUMP_PIN_NUMBERS[pump_index];
+            let pin_number = pump_pin_numbers[pump_index];
             let pump_number = pump_index as u8 + 1;
             log::info!("Getting line handle for pump {} on pin {}", pump_number, pin_number);
             match chip.get_line(pin_number) {
@@ -57,7 +45,7 @@ impl PumpService {
                 Err(e) => return Err(format!("Error getting line for pump {} on pin {}: {}", pump_number, pin_number, e))
             }
             let mut default_state = 0;
-            if IS_RELAY_INVERTED {
+            if is_relay_inverted {
                 default_state = 1;
             }
             match line.request(LineRequestFlags::OUTPUT, default_state, format!("Pump {}", pump_number).as_str()) {
@@ -70,24 +58,31 @@ impl PumpService {
             });
         }
         Ok(Self {
+            is_relay_inverted,
+            ms_per_ml,
+            pump_pin_numbers,
             line_handles: Arc::new(Mutex::new(line_handles)), // Revise all 3 of these with RwLock where appropriate
             pump_states: Arc::new(Mutex::new(pump_states)),
             pump_queue: Arc::new(Mutex::new(VecDeque::new()))
         })
     }
 
-    pub fn pump_number_is_valid(pump_number: u8) -> bool {
-        return pump_number > 0 && pump_number <= NUMBER_OF_PUMPS as u8;
+    pub fn get_number_of_pumps(&self) -> u8 {
+        self.pump_pin_numbers.len() as u8
+    }
+
+    pub fn pump_number_is_valid(pump_number: u8, number_of_pumps: u8) -> bool {
+        return pump_number > 0 && pump_number <= number_of_pumps;
     }
 
     pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, &str> {
-        if !PumpService::pump_number_is_valid(pump_number) {
+        if !PumpService::pump_number_is_valid(pump_number, self.get_number_of_pumps()) {
             return Err(INVALID_PUMP_NUMBER_ERROR);
         }
         if ml_to_pump == 0 {
             return Err("ml_to_pump must be greater than 0");
         }
-        let duration_in_milliseconds = ml_to_pump as u64 * MILLISECONDS_PER_ML;
+        let duration_in_milliseconds = ml_to_pump as u64 * self.ms_per_ml;
         log::info!("Scheduling pump {} to run for {} ms", pump_number, duration_in_milliseconds);
         self.pump_queue.lock().unwrap().push_back(PumpJob {
             pump_number: pump_number,
@@ -98,11 +93,12 @@ impl PumpService {
             Ordering::Acquire,
             Ordering::Relaxed);
         if result.is_ok() {
+            let is_relay_inverted = self.is_relay_inverted.clone();
             let pump_queue_arc = self.pump_queue.clone();
             let line_handles_arc = self.line_handles.clone();
             let pump_states_arc = self.pump_states.clone();
             let _ = thread::spawn(move || {
-                PumpService::process_queue(pump_queue_arc, line_handles_arc, pump_states_arc);
+                PumpService::process_queue(is_relay_inverted, pump_queue_arc, line_handles_arc, pump_states_arc);
                 IS_PROCESSING_QUEUE.store(false, Ordering::Release);
             });
         }
@@ -110,7 +106,7 @@ impl PumpService {
     }
 
     pub fn get_pump_state(&self, pump_number: u8) -> Result<PumpState, &str> {
-        if !PumpService::pump_number_is_valid(pump_number) {
+        if !PumpService::pump_number_is_valid(pump_number, self.get_number_of_pumps()) {
             return Err(INVALID_PUMP_NUMBER_ERROR);
         }
         Ok(self.pump_states.lock().unwrap()[pump_number as usize - 1].clone())
@@ -125,6 +121,7 @@ impl PumpService {
     }
 
     pub fn process_queue(
+        is_relay_inverted: bool,
         pump_queue_arc: Arc<Mutex<VecDeque<PumpJob>>>,
         line_handles_arc: Arc<Mutex<Vec<LineHandle>>>,
         pump_states_arc: Arc<Mutex<Vec<PumpState>>>
@@ -148,7 +145,7 @@ impl PumpService {
             if let Ok(locked_line_handles) = line_handles_arc.lock() {
                 let mut high = 1;
                 let mut low = 0;
-                if IS_RELAY_INVERTED {
+                if is_relay_inverted {
                     high = 0;
                     low = 1;
                 }
