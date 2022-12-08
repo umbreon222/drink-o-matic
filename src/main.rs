@@ -100,6 +100,8 @@ fn rocket() -> _ {
     // Init dotenv
     dotenv::from_filename("resources/.env").ok();
     let settings_file_path = dotenv::var("SETTINGS_FILE_PATH").unwrap();
+    // Need to parse this via https://crates.io/crates/strong-xml and pass it in to the services I think.
+    // Idk the best way of passing this in everywhere.
     let strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
     let is_relay_inverted = dotenv::var("IS_RELAY_INVERTED").unwrap().ends_with('1');
     let ms_per_ml = dotenv::var("MILLISECONDS_PER_ML").unwrap().parse::<u64>().unwrap();
