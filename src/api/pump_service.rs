@@ -126,12 +126,14 @@ impl PumpService {
             PumpService::process_queue(pump_queue_arc, line_handles_arc, pump_states_arc, run_daemon_pair);
         });
         self.daemon_thread = Some(thread_handle);
+        log::info!("Daemon thread started");
     }
     
     pub fn kill_daemon(&mut self) {
         self.notify_daemon(true);
         if let Some(daemon_thread) = self.daemon_thread.take() {
             daemon_thread.join().unwrap();
+            log::info!("Daemon thread killed");
         }
     }
     
