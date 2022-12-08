@@ -9,41 +9,43 @@ use rocket::fairing::{ Info, Fairing, Kind };
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
+use std::sync::{ Mutex, Arc };
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
 use crate::api::{ PumpService, SettingsService };
 
 #[get("/pumps")]
-fn pumps_get(pump_service: &State<PumpService>) -> Json<Vec<PumpState>> {
-    Json(pump_service.get_pump_states())
+fn pumps_get(pump_service: &State<Arc<Mutex<PumpService>>>) -> Json<Vec<PumpState>> {
+    Json(pump_service.lock().unwrap().get_pump_states())
 }
 
 #[get("/pump_queue")]
-fn pump_queue_get(pump_service: &State<PumpService>) -> Json<Vec<PumpJob>> {
-    Json(pump_service.get_pump_queue())
+fn pump_queue_get(pump_service: &State<Arc<Mutex<PumpService>>>) -> Json<Vec<PumpJob>> {
+    Json(pump_service.lock().unwrap().get_pump_queue())
 }
 
 #[get("/pumps/<pump_number>")]
-fn pump_number_get(pump_service: &State<PumpService>, pump_number: u8) -> Result<Json<PumpState>, status::BadRequest::<Json<GenericError>>> {
-    match pump_service.get_pump_state(pump_number) {
+fn pump_number_get(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8) -> Result<Json<PumpState>, status::BadRequest::<Json<GenericError>>> {
+    match pump_service.lock().unwrap().get_pump_state(pump_number) {
         Ok(pump_state) => Ok(Json(pump_state)),
         Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
     }
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<Json<Vec<PumpJob>>, status::BadRequest::<Json<GenericError>>> {
+fn pump_number_post(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<Json<Vec<PumpJob>>, status::BadRequest::<Json<GenericError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
         return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Expected ml to pump") }))));
     }
     match temp.parse::<u32>() {
-        Ok(ml_to_pump) => match pump_service.enqueue_pump(pump_number, ml_to_pump) {
+        Ok(ml_to_pump) => match pump_service.lock().unwrap().enqueue_pump(pump_number, ml_to_pump) {
             Ok(pump_queue) => Ok(Json(pump_queue)),
             Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
         },
         Err(_) => Err(status::BadRequest(Some(Json(GenericError { message: String::from("Couldn't parse ml to pump") }))))
     }
 }
+
 #[options("/settings")]
 fn settings_options() -> () { }
 
@@ -84,16 +86,17 @@ impl Fairing for CORS {
     }
 }
 
-#[launch]
-fn rocket() -> _ {
+#[rocket::main]
+async fn main() -> Result<(), rocket::error::Error> {
     env_logger::init();
-    let pump_service: PumpService;
+    let pump_service: Arc<Mutex<PumpService>>;
     match PumpService::new() {
-        Ok(new_pump_service) => pump_service = new_pump_service,
+        Ok(new_pump_service) => pump_service = Arc::new(Mutex::new(new_pump_service)),
         Err(error) => {
             panic!("Couldn't create pump service: {}", error);
         }
     }
+    pump_service.lock().unwrap().start_daemon();
     let settings_service: SettingsService;
     match SettingsService::new() {
         Ok(new_settings_service) => settings_service = new_settings_service,
@@ -101,9 +104,15 @@ fn rocket() -> _ {
             panic!("Couldn't create settings service: {}", error);
         }
     }
-    rocket::build()
+    let _rocket = rocket::build()
         .attach(CORS)
         .mount("/", routes![pumps_get, pump_queue_get, pump_number_get, pump_number_post, settings_options, settings_get, settings_put])
-        .manage(pump_service)
+        .manage(pump_service.clone())
         .manage(settings_service)
+        .ignite().await?
+        .launch().await?;
+
+    pump_service.lock().unwrap().kill_daemon();
+
+    Ok(())
 }
