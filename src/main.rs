@@ -9,6 +9,7 @@ use rocket::fairing::{ Info, Fairing, Kind };
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
+use std::sync::{ Mutex, Arc };
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
 use crate::api::{ PumpService, SettingsService };
 
@@ -16,37 +17,37 @@ use crate::api::{ PumpService, SettingsService };
 fn pumps_options() -> () { }
 
 #[get("/pumps")]
-fn pumps_get(pump_service: &State<PumpService>) -> Json<Vec<PumpState>> {
-    Json(pump_service.get_pump_states())
+fn pumps_get(pump_service: &State<Arc<Mutex<PumpService>>>) -> Json<Vec<PumpState>> {
+    Json(pump_service.lock().unwrap().get_pump_states())
 }
 
 #[options("/pump_queue")]
 fn pump_queue_options() -> () { }
 
 #[get("/pump_queue")]
-fn pump_queue_get(pump_service: &State<PumpService>) -> Json<Vec<PumpJob>> {
-    Json(pump_service.get_pump_queue())
+fn pump_queue_get(pump_service: &State<Arc<Mutex<PumpService>>>) -> Json<Vec<PumpJob>> {
+    Json(pump_service.lock().unwrap().get_pump_queue())
 }
 
 #[options("/pumps/<_pump_number>")]
 fn pump_number_options(_pump_number: u8) -> () { }
 
 #[get("/pumps/<pump_number>")]
-fn pump_number_get(pump_service: &State<PumpService>, pump_number: u8) -> Result<Json<PumpState>, status::BadRequest::<Json<GenericError>>> {
-    match pump_service.get_pump_state(pump_number) {
+fn pump_number_get(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8) -> Result<Json<PumpState>, status::BadRequest::<Json<GenericError>>> {
+    match pump_service.lock().unwrap().get_pump_state(pump_number) {
         Ok(pump_state) => Ok(Json(pump_state)),
         Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
     }
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(pump_service: &State<PumpService>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
+fn pump_number_post(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
         return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Expected ml to pump") }))));
     }
     match temp.parse::<u32>() {
-        Ok(ml_to_pump) => match pump_service.enqueue_pump(pump_number, ml_to_pump) {
+        Ok(ml_to_pump) => match pump_service.lock().unwrap().enqueue_pump(pump_number, ml_to_pump) {
             Ok(pump_queue) => Ok(status::Accepted(Some(Json(pump_queue)))),
             Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
         },
@@ -92,8 +93,8 @@ impl Fairing for CORS {
     }
 }
 
-#[launch]
-fn rocket() -> _ {
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
     // Init logger
     env_logger::init();
 
@@ -109,16 +110,16 @@ fn rocket() -> _ {
     let pump_pin_numbers_string = dotenv::var("ORDERED_PUMP_PIN_NUMBERS").unwrap();
     let pump_pin_numbers: Vec<u32> = pump_pin_numbers_string.split(',').map(|f| f.parse::<u32>().unwrap()).collect();
 
-    let pump_service: PumpService;
+    let pump_service: Arc<Mutex<PumpService>>;
     match PumpService::new(rpi_chip_name, is_relay_inverted, pump_pin_numbers, ms_per_ml) {
-        Ok(new_pump_service) => pump_service = new_pump_service,
+        Ok(new_pump_service) => pump_service = Arc::new(Mutex::new(new_pump_service)),
         Err(error) => {
             panic!("Couldn't create pump service: {}", error);
         }
     }
-
+    pump_service.lock().unwrap().start_daemon();
     let settings_service: SettingsService;
-    match SettingsService::new(settings_file_path, pump_service.get_number_of_pumps()) {
+    match SettingsService::new(settings_file_path, pump_service.lock().unwrap().get_number_of_pumps()) {
         Ok(new_settings_service) => settings_service = new_settings_service,
         Err(error) => {
             panic!("Couldn't create settings service: {}", error);
@@ -138,8 +139,15 @@ fn rocket() -> _ {
         settings_put
     ];
     
-    rocket::build()
+    let _rocket = rocket::build()
         .attach(CORS)
-        .mount("/", routes).manage(pump_service)
+        .mount("/", routes)
+        .manage(pump_service.clone())
         .manage(settings_service)
+        .ignite().await?
+        .launch().await?;
+
+    pump_service.lock().unwrap().kill_daemon();
+
+    Ok(())
 }
