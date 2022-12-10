@@ -151,7 +151,7 @@ impl PumpService {
         pump_states_arc: Arc<Mutex<Vec<PumpState>>>,
         should_run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
     ) {
-        log::info!("Starting to process queue");
+        log::debug!("Starting to pump job queue processor daemon");
         let (should_run_daemon_mutex, cvar) = &*should_run_daemon_pair;
         let mut should_run_daemon = false;
         if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
@@ -197,14 +197,22 @@ impl PumpService {
                     // Get next in line job for processing if any
                     pump_job_to_process = pump_queue.get(0).copied();
                 }
+                // Intermediate checking for daemon killed
+                if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
+                    if !*should_run_daemon_guard {
+                        log::debug!("Pump job queue processor daemon killed while processing jobs");
+                        return;
+                    }
+                }
             }
+            log::debug!("Finished processing pump job queue");
             if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
-                log::debug!("Waiting for \"should run daemon guard\"");
+                log::debug!("Waiting for \"should run pump queue daemon guard\"");
                 let temp_should_run_daemon_guard = cvar.wait(should_run_daemon_guard).unwrap();
                 should_run_daemon = temp_should_run_daemon_guard.clone();
-                log::debug!("Received \"should run daemon guard\": {}", should_run_daemon);
+                log::debug!("Received \"should run pump queue daemon guard\": {}", should_run_daemon);
             }
         }
-        log::info!("Finished processing queue");
+        log::debug!("Queue processor daemon killed");
     }
 }
