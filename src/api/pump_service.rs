@@ -145,19 +145,26 @@ impl PumpService {
         cvar.notify_one();
     }
 
-    pub fn process_queue(
+    fn process_queue(
         pump_queue_arc: Arc<Mutex<VecDeque<PumpJob>>>,
         line_handles_arc: Arc<Mutex<Vec<LineHandle>>>,
         pump_states_arc: Arc<Mutex<Vec<PumpState>>>,
-        run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
+        should_run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
     ) {
         log::info!("Starting to process queue");
-        let (lock, cvar) = &*run_daemon_pair;
-        let mut should_run = lock.lock().unwrap();
-        while *should_run {
-            while let Some(pump_job) = pump_queue_arc.lock().unwrap().get(0) {
+        let (should_run_daemon_mutex, cvar) = &*should_run_daemon_pair;
+        let mut should_run_daemon = false;
+        if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
+            should_run_daemon = should_run_daemon_guard.clone();
+        }
+        while should_run_daemon {
+            // Get first in line job, leave in queue until done processing
+            let mut pump_job_to_process: Option<PumpJob> = None;
+            if let Ok(pump_queue) = pump_queue_arc.lock() {
+                pump_job_to_process = pump_queue.get(0).copied();
+            }
+            while let Some(pump_job) = pump_job_to_process {
                 let index = pump_job.pump_number as usize - 1;
-                pump_queue_arc.lock().unwrap().pop_front(); // Discard the element we just processed
                 let duration: Duration;
                 if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
                     log::info!("Processing job to run pump {} for {} ms", pump_job.pump_number, pump_job.duration_in_milliseconds);
@@ -174,18 +181,29 @@ impl PumpService {
                         high = 0;
                         low = 1;
                     }
-                    log::info!("Setting pump {} to HIGH={}", pump_job.pump_number, high);
+                    log::debug!("Setting pump {} to HIGH={}", pump_job.pump_number, high);
                     // Force panic if pump value can't be set.
                     locked_line_handles[index].set_value(high).unwrap();
                     thread::sleep(duration);
-                    log::info!("Setting pump {} to LOW={}", pump_job.pump_number, low);
+                    log::debug!("Setting pump {} to LOW={}", pump_job.pump_number, low);
                     locked_line_handles[index].set_value(low).unwrap();
                 }
                 if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
                     locked_pump_states[pump_job.pump_number as usize - 1].is_running = false;
                 }
+                if let Ok(mut pump_queue) = pump_queue_arc.lock() {
+                    // Discard the job we just processed
+                    pump_queue.pop_front();
+                    // Get next in line job for processing if any
+                    pump_job_to_process = pump_queue.get(0).copied();
+                }
             }
-            should_run = cvar.wait(should_run).unwrap();
+            if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
+                log::debug!("Waiting for \"should run daemon guard\"");
+                let temp_should_run_daemon_guard = cvar.wait(should_run_daemon_guard).unwrap();
+                should_run_daemon = temp_should_run_daemon_guard.clone();
+                log::debug!("Received \"should run daemon guard\": {}", should_run_daemon);
+            }
         }
         log::info!("Finished processing queue");
     }
