@@ -1,6 +1,6 @@
 use rocket::serde::Serialize;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Copy)]
 #[serde(crate = "rocket::serde")]
 pub struct PumpJob {
     pub pump_number: u8,
