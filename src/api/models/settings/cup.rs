@@ -3,8 +3,11 @@ use rocket::serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct Ingredient {
+pub struct Cup {
     pub id: Uuid,
+    #[serde(rename  = "imageUrl")]
+    pub image_url: String,
     pub name: String,
-    pub modifier: u16,
+    #[serde(rename  = "volumeMl")]
+    pub volume_ml: u16
 }

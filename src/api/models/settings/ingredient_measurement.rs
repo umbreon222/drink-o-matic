@@ -3,8 +3,8 @@ use rocket::serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct Ingredient {
-    pub id: Uuid,
-    pub name: String,
-    pub modifier: u16,
+pub struct IngredientMeasurement {
+    #[serde(rename  = "ingredientId")]
+    pub ingredient_id: Uuid,
+    pub parts: u16
 }

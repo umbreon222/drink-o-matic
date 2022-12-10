@@ -1,3 +1,4 @@
+use crate::api::models::settings::IngredientMeasurement;
 use uuid::Uuid;
 use rocket::serde::{ Deserialize, Serialize };
 
@@ -8,13 +9,15 @@ const STAR_RATING_MAX: u8 = 5;
 #[serde(crate = "rocket::serde")]
 pub struct Drink {
     pub id: Uuid,
-    #[serde(alias = "imageUrl")]
+    #[serde(rename  = "imageUrl")]
     pub image_url: String,
     pub name: String,
     pub description: String,
-    #[serde(alias = "ingredientIds")]
-    pub ingredient_ids: Vec<Uuid>,
-    #[serde(alias = "starRating")]
+    #[serde(rename  = "ingredientMeasurements")]
+    pub ingredient_measurements: Vec<IngredientMeasurement>,
+    #[serde(rename  = "defaultCupId")]
+    pub default_cup_id: Option<Uuid>,
+    #[serde(rename  = "starRating")]
     pub star_rating: u8
 }
 

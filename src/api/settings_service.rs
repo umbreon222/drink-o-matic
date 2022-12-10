@@ -41,6 +41,9 @@ impl SettingsService {
                     Ok(_) => {
                         match OpenOptions::new().write(true).create(true).open(self.settings_file_path.clone()) {
                             Ok(mut settings_file) => {
+                                if settings_file.set_len(0).is_err() {
+                                    return Err(format!("Couldn't truncate settings file"));
+                                }
                                 match settings_file.write_all(settings_json.as_bytes()) {
                                     Ok(_) => {
                                         *self.settings.write().unwrap() = settings;
