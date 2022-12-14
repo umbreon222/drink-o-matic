@@ -8,10 +8,14 @@ use crate::api::models::settings::Settings;
 
 pub struct SettingsService {
     pub settings: RwLock<Settings>,
-    pub settings_file_path: Box<Path>,
+    settings_file_path: Box<Path>
 }
 
 impl SettingsService {
+    pub fn new(settings: RwLock<Settings>, settings_file_path: Box<Path>) -> SettingsService {
+        SettingsService { settings, settings_file_path }
+    }
+
     pub fn save(&self, settings: Settings) -> Result<(), String> {
         match serde_json::to_string(&settings) {
             Ok(settings_json) => {

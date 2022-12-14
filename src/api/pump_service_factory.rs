@@ -19,16 +19,16 @@ impl PumpServiceFactory {
         let line_handles = Self::get_line_handles(rpi_chip_name, &pump_pin_numbers, is_relay_inverted);
         let initial_pump_states = (1..=pump_pin_numbers.len() as u8).map(|pump_number| PumpState { pump_number, is_running: is_relay_inverted }).collect();
 
-        PumpService {
+        PumpService::new(
             is_relay_inverted,
-            ms_per_ml,
             pump_pin_numbers,
-            daemon_thread: None,
-            line_handles: Arc::new(Mutex::new(line_handles)), // Revise all 3 of these with RwLock where appropriate
-            pump_states: Arc::new(Mutex::new(initial_pump_states)),
-            pump_queue: Arc::new(Mutex::new(VecDeque::new())),
-            run_daemon_pair: Arc::new((Mutex::new(true), Condvar::new()))
-        }
+            ms_per_ml,
+            None,
+            Arc::new(Mutex::new(line_handles)), // Revise all 3 of these with RwLock where appropriate
+            Arc::new(Mutex::new(initial_pump_states)),
+            Arc::new(Mutex::new(VecDeque::new())),
+            Arc::new((Mutex::new(true), Condvar::new()))
+        )
     }
 
     fn get_line_handles(rpi_chip_name: String, pump_pin_numbers: &Vec<u32>, is_relay_inverted: bool) -> Vec<LineHandle> {

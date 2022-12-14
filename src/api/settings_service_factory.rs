@@ -21,9 +21,9 @@ impl SettingsServiceFactory {
             }
         }
         
-        SettingsService {
-            settings: RwLock::new(settings),
-            settings_file_path: file_path.into_boxed_path()
-        }
+        SettingsService::new(
+            RwLock::new(settings),
+            file_path.into_boxed_path()
+        )
     }
 }
