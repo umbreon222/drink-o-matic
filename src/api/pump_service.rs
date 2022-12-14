@@ -3,9 +3,9 @@ use std::thread;
 use std::time::Duration;
 use std::sync::{ Mutex, Arc, Condvar };
 #[cfg(feature = "use-gpio")]
-use gpio_cdev::{ Chip, Line, LineRequestFlags, LineHandle };
+use gpio_cdev::LineHandle;
 #[cfg(not(feature = "use-gpio"))]
-use crate::api::mock::{ Chip, Line, LineRequestFlags, LineHandle };
+use crate::api::mock::LineHandle;
 use crate::api::models::{ PumpState, PumpJob };
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
@@ -22,52 +22,6 @@ pub struct PumpService {
 }
 
 impl PumpService {
-    pub fn new(rpi_chip_name: String, is_relay_inverted: bool, pump_pin_numbers: Vec<u32>, ms_per_ml: u64) -> Result<Self, String> {
-        if cfg!(not(feature = "use-gpio")) {
-            log::info!("Feature \"use-gpio\" was not set; GPIO will be mocked");
-        }
-        let mut chip: Chip;
-        log::info!("Getting chip \"{}\"", rpi_chip_name);
-        match Chip::new(&rpi_chip_name) {
-            Ok(res) => chip = res,
-            Err(e) => return Err(format!("Error getting chip \"{}\": {}", rpi_chip_name, e))
-        }
-        let mut line_handles: Vec<LineHandle> = vec![];
-        let mut pump_states: Vec<PumpState> = vec![];
-        for pump_index in 0..(pump_pin_numbers.len() as usize) {
-            let line: Line;
-            let pin_number = pump_pin_numbers[pump_index];
-            let pump_number = pump_index as u8 + 1;
-            log::info!("Getting line handle for pump {} on pin {}", pump_number, pin_number);
-            match chip.get_line(pin_number) {
-                Ok(res) => line = res,
-                Err(e) => return Err(format!("Error getting line for pump {} on pin {}: {}", pump_number, pin_number, e))
-            }
-            let mut default_state = 0;
-            if is_relay_inverted {
-                default_state = 1;
-            }
-            match line.request(LineRequestFlags::OUTPUT, default_state, format!("Pump {}", pump_number).as_str()) {
-                Ok(line_handle) => line_handles.push(line_handle),
-                Err(e) => return Err(format!("Error getting line handle for pump {} on pin {}: {}", pump_number, pin_number, e))
-            }
-            pump_states.push(PumpState {
-                pump_number,
-                is_running: false
-            });
-        }
-        Ok(Self {
-            is_relay_inverted,
-            ms_per_ml,
-            pump_pin_numbers,
-            daemon_thread: None,
-            line_handles: Arc::new(Mutex::new(line_handles)), // Revise all 3 of these with RwLock where appropriate
-            pump_states: Arc::new(Mutex::new(pump_states)),
-            pump_queue: Arc::new(Mutex::new(VecDeque::new())),
-            run_daemon_pair: Arc::new((Mutex::new(true), Condvar::new()))
-        })
-    }
-
     pub fn get_number_of_pumps(&self) -> u8 {
         self.pump_pin_numbers.len() as u8
     }

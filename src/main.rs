@@ -11,7 +11,7 @@ use rocket::response::status;
 use rocket::serde::json::Json;
 use std::sync::{ Mutex, Arc };
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
-use crate::api::{ PumpService, SettingsService };
+use crate::api::{ PumpService, PumpServiceFactory, SettingsService };
 
 #[options("/pumps")]
 fn pumps_options() -> () { }
@@ -100,24 +100,16 @@ async fn main() -> Result<(), rocket::Error> {
 
     // Init dotenv
     dotenv::from_filename("resources/.env").ok();
+
     let settings_file_path = dotenv::var("SETTINGS_FILE_PATH").unwrap();
     // Need to parse this via https://crates.io/crates/strong-xml and pass it in to the services I think.
     // Idk the best way of passing this in everywhere.
-    let strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
-    let is_relay_inverted = dotenv::var("IS_RELAY_INVERTED").unwrap().ends_with('1');
-    let ms_per_ml = dotenv::var("MILLISECONDS_PER_ML").unwrap().parse::<u64>().unwrap();
-    let rpi_chip_name = dotenv::var("RPI_CHIP_NAME").unwrap();
-    let pump_pin_numbers_string = dotenv::var("ORDERED_PUMP_PIN_NUMBERS").unwrap();
-    let pump_pin_numbers: Vec<u32> = pump_pin_numbers_string.split(',').map(|f| f.parse::<u32>().unwrap()).collect();
+    let _strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
 
-    let pump_service: Arc<Mutex<PumpService>>;
-    match PumpService::new(rpi_chip_name, is_relay_inverted, pump_pin_numbers, ms_per_ml) {
-        Ok(new_pump_service) => pump_service = Arc::new(Mutex::new(new_pump_service)),
-        Err(error) => {
-            panic!("Couldn't create pump service: {}", error);
-        }
-    }
-    pump_service.lock().unwrap().start_daemon();
+    let pump_service = PumpServiceFactory::create_or_panic();
+    pump_service.start_daemon();
+    let pump_service_arc = Arc::new(Mutex::new(pump_service));
+
     let settings_service: SettingsService;
     match SettingsService::new(settings_file_path, pump_service.lock().unwrap().get_number_of_pumps()) {
         Ok(new_settings_service) => settings_service = new_settings_service,
@@ -142,12 +134,11 @@ async fn main() -> Result<(), rocket::Error> {
     let _rocket = rocket::build()
         .attach(CORS)
         .mount("/", routes)
-        .manage(pump_service.clone())
+        .manage(pump_service_arc.clone())
         .manage(settings_service)
         .ignite().await?
         .launch().await?;
 
-    pump_service.lock().unwrap().kill_daemon();
-
+    pump_service_arc.lock().unwrap().kill_daemon();
     Ok(())
 }
