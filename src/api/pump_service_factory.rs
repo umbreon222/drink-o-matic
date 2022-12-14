@@ -16,7 +16,7 @@ impl PumpServiceFactory {
         let rpi_chip_name = dotenv::var("RPI_CHIP_NAME").unwrap();
         let pump_pin_numbers_string = dotenv::var("ORDERED_PUMP_PIN_NUMBERS").unwrap();
         let pump_pin_numbers: Vec<u32> = pump_pin_numbers_string.split(',').map(|num| num.parse::<u32>().unwrap()).collect();
-        let line_handles = get_line_handles(rpi_chip_name, &pump_pin_numbers, is_relay_inverted);
+        let line_handles = Self::get_line_handles(rpi_chip_name, &pump_pin_numbers, is_relay_inverted);
         let initial_pump_states = (1..=pump_pin_numbers.len() as u8).map(|pump_number| PumpState { pump_number, is_running: is_relay_inverted }).collect();
 
         PumpService {

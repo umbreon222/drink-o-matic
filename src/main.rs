@@ -1,5 +1,6 @@
 mod api;
 
+use std::sync::{ Mutex, Arc };
 #[macro_use] extern crate rocket;
 extern crate env_logger;
 use rocket::http::Header;
@@ -9,9 +10,8 @@ use rocket::fairing::{ Info, Fairing, Kind };
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
-use std::sync::{ Mutex, Arc };
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
-use crate::api::{ PumpService, PumpServiceFactory, SettingsService };
+use crate::api::{ PumpService, PumpServiceFactory, SettingsService, SettingsServiceFactory };
 
 #[options("/pumps")]
 fn pumps_options() -> () { }
@@ -101,22 +101,18 @@ async fn main() -> Result<(), rocket::Error> {
     // Init dotenv
     dotenv::from_filename("resources/.env").ok();
 
-    let settings_file_path = dotenv::var("SETTINGS_FILE_PATH").unwrap();
     // Need to parse this via https://crates.io/crates/strong-xml and pass it in to the services I think.
     // Idk the best way of passing this in everywhere.
     let _strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
 
-    let pump_service = PumpServiceFactory::create_or_panic();
+    // Create pump service
+    let mut pump_service = PumpServiceFactory::create_or_panic();
+    let number_of_pumps = pump_service.get_number_of_pumps();
     pump_service.start_daemon();
     let pump_service_arc = Arc::new(Mutex::new(pump_service));
 
-    let settings_service: SettingsService;
-    match SettingsService::new(settings_file_path, pump_service.lock().unwrap().get_number_of_pumps()) {
-        Ok(new_settings_service) => settings_service = new_settings_service,
-        Err(error) => {
-            panic!("Couldn't create settings service: {}", error);
-        }
-    }
+    // Create settings service
+    let settings_service = SettingsServiceFactory::create_or_panic(number_of_pumps);
 
     let routes = routes![
         pumps_options,

@@ -8,30 +8,10 @@ use crate::api::models::settings::Settings;
 
 pub struct SettingsService {
     pub settings: RwLock<Settings>,
-    settings_file_path: Box<Path>,
+    pub settings_file_path: Box<Path>,
 }
 
 impl SettingsService {
-    pub fn new(settings_file_path: String, number_of_pumps: u8) -> Result<Self, String> {
-        let home_dir = dirs::home_dir().unwrap();
-        let file_path = home_dir.join(settings_file_path);
-        let settings: Settings;
-        match fs::read_to_string(file_path.clone()) {
-            Ok(existing_settings_json) => {
-                match serde_json::from_str(&existing_settings_json) {
-                    Ok(existing_settings) => settings = existing_settings,
-                    Err(error) => {
-                        return Err(format!("Couldn't parse existing settings: {}", error));
-                    }
-                }
-            }
-            Err(_) => {
-                settings = Settings::new(number_of_pumps);
-            }
-        }
-        Ok(SettingsService { settings: RwLock::new(settings), settings_file_path: file_path.into_boxed_path() })
-    }
-
     pub fn save(&self, settings: Settings) -> Result<(), String> {
         match serde_json::to_string(&settings) {
             Ok(settings_json) => {

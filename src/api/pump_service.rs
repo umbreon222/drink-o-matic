@@ -11,14 +11,14 @@ use crate::api::models::{ PumpState, PumpJob };
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
 
 pub struct PumpService {
-    is_relay_inverted: bool,
-    pump_pin_numbers: Vec<u32>,
-    ms_per_ml: u64,
-    daemon_thread: Option<thread::JoinHandle<()>>,
-    line_handles: Arc<Mutex<Vec<LineHandle>>>,
-    pump_states: Arc<Mutex<Vec<PumpState>>>,
-    pump_queue: Arc<Mutex<VecDeque<PumpJob>>>,
-    run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
+    pub is_relay_inverted: bool,
+    pub pump_pin_numbers: Vec<u32>,
+    pub ms_per_ml: u64,
+    pub daemon_thread: Option<thread::JoinHandle<()>>,
+    pub line_handles: Arc<Mutex<Vec<LineHandle>>>,
+    pub pump_states: Arc<Mutex<Vec<PumpState>>>,
+    pub pump_queue: Arc<Mutex<VecDeque<PumpJob>>>,
+    pub run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
 }
 
 impl PumpService {
