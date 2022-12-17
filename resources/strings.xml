@@ -3,9 +3,7 @@
     <string name="invalid_pump_number_error_message">Invalid pump number</string>
     <string name="mocking_gpio_info_message">Feature "use-gpio" was not set; GPIO will be mocked</string>
     <string name="getting_chip_info_message_template">Getting chip "{{chip_name}}"</string>
-    <string name="getting_chip_error_message_template">Error getting chip "{{chip_name}}": {{error_message}}</string>
     <string name="getting_line_handle_info_message_template">Getting line handle for pump {{pump_number}} on pin {{pin_number}}</string>
-    <string name="getting_line_handle_error_message_template">Error getting line for pump {{pump_number}} on pin {{pin_number}}: {{error_message}}</string>
     <string name="ml_to_pump_must_be_greater_than_zero_error_message">ml_to_pump must be greater than 0</string>
     <string name="scheduling_pump_info_message_template">Scheduling pump {{pump_number}} to run for {{milliseconds}} ms</string>
     <string name="starting_process_queue_info_message">Starting to process queue</string>
@@ -17,7 +15,6 @@
     <string name="ml_to_pump_parse_error_message">Couldn't parse ml to pump</string>
     <string name="invalid_ml_to_pump_error_message">ml to pump must be greater than 0</string>
     <string name="invalid_settings_error_message">Settings are invalid</string>
-    <string name="attaching_cors_header_info_message">Attaching CORS headers to responses</string>
     <string name="creating_pump_service_error_message_template">Couldn't create pump service: </string>
     <string name="creating_settings_service_error_message_template">Couldn't create settings service: </string>
     <string name="parsing_settings_file_error_message_template">Couldn't parse existing settings: </string>

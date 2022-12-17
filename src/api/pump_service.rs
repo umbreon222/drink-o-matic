@@ -10,8 +10,6 @@ use crate::api::mock::LineHandle;
 use crate::api::models::{ PumpState, PumpJob };
 use crate::api::ResourceService;
 
-const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
-
 pub struct PumpService {
     resource_service: ResourceService,
     is_relay_inverted: bool,
@@ -59,7 +57,8 @@ impl PumpService {
     
     pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, String> {
         if !PumpService::pump_number_is_valid(pump_number, self.get_number_of_pumps()) {
-            return Err(INVALID_PUMP_NUMBER_ERROR.to_string());
+            let invalid_pump_number_message = self.resource_service.get_resource_string_by_name("invalid_pump_number_error_message").unwrap();
+            return Err(invalid_pump_number_message);
         }
         if ml_to_pump == 0 {
             let invalid_ml_to_pump_message = self.resource_service.get_resource_string_by_name("invalid_ml_to_pump_error_message").unwrap();
@@ -78,9 +77,10 @@ impl PumpService {
         Ok(pump_queue)
     }
 
-    pub fn get_pump_state(&self, pump_number: u8) -> Result<PumpState, &str> {
+    pub fn get_pump_state(&self, pump_number: u8) -> Result<PumpState, String> {
         if !PumpService::pump_number_is_valid(pump_number, self.get_number_of_pumps()) {
-            return Err(INVALID_PUMP_NUMBER_ERROR);
+            let invalid_pump_number_message = self.resource_service.get_resource_string_by_name("invalid_pump_number_error_message").unwrap();
+            return Err(invalid_pump_number_message);
         }
         Ok(self.pump_states.lock().unwrap()[pump_number as usize - 1].clone())
     }

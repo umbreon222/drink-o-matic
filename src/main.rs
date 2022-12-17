@@ -16,6 +16,7 @@ use crate::api::{
     PumpServiceFactory,
     SettingsService,
     SettingsServiceFactory,
+    ResourceService,
     ResourceServiceFactory
 };
 
@@ -47,17 +48,21 @@ fn pump_number_get(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
+fn pump_number_post(resource_service: &State<ResourceService>, pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
-        return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Expected ml to pump") }))));
+        let expected_ml_to_pump_message = resource_service.get_resource_string_by_name("expected_ml_to_pump_error_message").unwrap();
+        return Err(status::BadRequest(Some(Json(GenericError { message: expected_ml_to_pump_message }))));
     }
     match temp.parse::<u32>() {
         Ok(ml_to_pump) => match pump_service.lock().unwrap().enqueue_pump(pump_number, ml_to_pump) {
             Ok(pump_queue) => Ok(status::Accepted(Some(Json(pump_queue)))),
             Err(error) => Err(status::BadRequest(Some(Json(GenericError { message: error.to_string() }))))
         },
-        Err(_) => Err(status::BadRequest(Some(Json(GenericError { message: String::from("Couldn't parse ml to pump") }))))
+        Err(_) => {
+            let ml_to_pump_parse_message = resource_service.get_resource_string_by_name("ml_to_pump_parse_error_message").unwrap();
+            Err(status::BadRequest(Some(Json(GenericError { message: ml_to_pump_parse_message }))))
+        }
     }
 }
 
@@ -70,10 +75,11 @@ fn settings_get(settings_service: &State<SettingsService>) -> Json<Settings> {
 }
 
 #[put("/settings", format = "application/json", data = "<settings_json>")]
-fn settings_put(settings_service: &State<SettingsService>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
+fn settings_put(resource_service: &State<ResourceService>, settings_service: &State<SettingsService>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
     let settings = settings_json.into_inner();
     if !settings.is_valid() {
-        return Err(status::BadRequest(Some(Json(GenericError { message: String::from("Settings are invalid") }))));
+        let settings_invalid_message = resource_service.get_resource_string_by_name("invalid_settings_error_message").unwrap();
+        return Err(status::BadRequest(Some(Json(GenericError { message: settings_invalid_message }))));
     }
     match settings_service.save(settings) {
         Ok(_) => Ok(status::NoContent),
