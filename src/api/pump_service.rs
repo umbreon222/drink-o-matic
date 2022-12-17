@@ -4,13 +4,16 @@ use std::time::Duration;
 use std::sync::{ Mutex, Arc, Condvar };
 #[cfg(feature = "use-gpio")]
 use gpio_cdev::LineHandle;
+use serde_json::json;
 #[cfg(not(feature = "use-gpio"))]
 use crate::api::mock::LineHandle;
 use crate::api::models::{ PumpState, PumpJob };
+use crate::api::ResourceService;
 
 const INVALID_PUMP_NUMBER_ERROR: &str = "Invalid pump number";
 
 pub struct PumpService {
+    resource_service: ResourceService,
     is_relay_inverted: bool,
     pump_pin_numbers: Vec<u32>,
     ms_per_ml: u64,
@@ -22,7 +25,8 @@ pub struct PumpService {
 }
 
 impl PumpService {
-    pub fn new (
+    pub fn new(
+        resource_service: ResourceService,
         is_relay_inverted: bool,
         pump_pin_numbers: Vec<u32>,
         ms_per_ml: u64,
@@ -33,6 +37,7 @@ impl PumpService {
         run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
     ) -> PumpService {
         PumpService {
+            resource_service,
             is_relay_inverted,
             pump_pin_numbers,
             ms_per_ml,
@@ -51,16 +56,19 @@ impl PumpService {
     pub fn pump_number_is_valid(pump_number: u8, number_of_pumps: u8) -> bool {
         return pump_number > 0 && pump_number <= number_of_pumps;
     }
-
-    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, &str> {
+    
+    pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, String> {
         if !PumpService::pump_number_is_valid(pump_number, self.get_number_of_pumps()) {
-            return Err(INVALID_PUMP_NUMBER_ERROR);
+            return Err(INVALID_PUMP_NUMBER_ERROR.to_string());
         }
         if ml_to_pump == 0 {
-            return Err("ml_to_pump must be greater than 0");
+            let invalid_ml_to_pump_message = self.resource_service.get_resource_string_by_name("invalid_ml_to_pump_error_message").unwrap();
+            return Err(invalid_ml_to_pump_message);
         }
         let duration_in_milliseconds = ml_to_pump as u64 * self.ms_per_ml;
-        log::info!("Scheduling pump {} to run for {} ms", pump_number, duration_in_milliseconds);
+        let message_data = &json!({"pump_number": pump_number, "milliseconds": duration_in_milliseconds});
+        let scheduling_pump_message = self.resource_service.render_resource_template_string_by_name("scheduling_pump_info_message_template", message_data).unwrap();
+        log::info!("{}", scheduling_pump_message);
         self.pump_queue.lock().unwrap().push_back(PumpJob {
             pump_number,
             duration_in_milliseconds
@@ -89,23 +97,31 @@ impl PumpService {
         if !self.daemon_thread.is_none() {
             return;
         }
+        let resource_service = self.resource_service.clone();
         let is_relay_inverted = self.is_relay_inverted.clone();
         let pump_queue_arc = self.pump_queue.clone();
         let line_handles_arc = self.line_handles.clone();
         let pump_states_arc = self.pump_states.clone();
         let run_daemon_pair = self.run_daemon_pair.clone();
         let thread_handle = thread::spawn(move || {
-            PumpService::process_queue(is_relay_inverted, pump_queue_arc, line_handles_arc, pump_states_arc, run_daemon_pair);
+            PumpService::process_queue(
+                resource_service,
+                is_relay_inverted, pump_queue_arc,
+                line_handles_arc, pump_states_arc,
+                run_daemon_pair
+            );
         });
         self.daemon_thread = Some(thread_handle);
-        log::info!("Daemon thread started");
+        let started_daemon_thread_message = self.resource_service.get_resource_string_by_name("daemon_thread_started_message").unwrap();
+        log::info!("{}", started_daemon_thread_message);
     }
     
     pub fn kill_daemon(&mut self) {
         self.notify_daemon(true);
         if let Some(daemon_thread) = self.daemon_thread.take() {
             daemon_thread.join().unwrap();
-            log::info!("Daemon thread killed");
+            let killed_daemon_thread_message = self.resource_service.get_resource_string_by_name("daemon_thread_killed_message").unwrap();
+            log::info!("{}", killed_daemon_thread_message);
         }
     }
     
@@ -118,13 +134,15 @@ impl PumpService {
     }
 
     fn process_queue(
+        resource_service: ResourceService,
         is_relay_inverted: bool,
         pump_queue_arc: Arc<Mutex<VecDeque<PumpJob>>>,
         line_handles_arc: Arc<Mutex<Vec<LineHandle>>>,
         pump_states_arc: Arc<Mutex<Vec<PumpState>>>,
         should_run_daemon_pair: Arc<(Mutex<bool>, Condvar)>
     ) {
-        log::debug!("Starting to pump job queue processor daemon");
+        let starting_daemon_thread_message = resource_service.get_resource_string_by_name("starting_daemon_thread_message").unwrap();
+        log::debug!("{}", starting_daemon_thread_message);
         let (should_run_daemon_mutex, cvar) = &*should_run_daemon_pair;
         let mut should_run_daemon = false;
         if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
@@ -140,12 +158,15 @@ impl PumpService {
                 let index = pump_job.pump_number as usize - 1;
                 let duration: Duration;
                 if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
-                    log::info!("Processing job to run pump {} for {} ms", pump_job.pump_number, pump_job.duration_in_milliseconds);
+                    let processing_job_message_data = &json!({"pump_number": pump_job.pump_number, "milliseconds": pump_job.duration_in_milliseconds});
+                    let processing_job_message = resource_service.render_resource_template_string_by_name("processing_job_info_message_template", processing_job_message_data).unwrap();
+                    log::info!("{}", processing_job_message);
                     locked_pump_states[index].is_running = true;
                     duration = Duration::from_millis(pump_job.duration_in_milliseconds);
                 }
                 else {
-                    panic!("Failed to lock pump states");
+                    let failed_to_lock_pump_states_error_message = resource_service.get_resource_string_by_name("failed_to_lock_pump_states_error_message").unwrap();
+                    panic!("{}", failed_to_lock_pump_states_error_message);
                 }
                 if let Ok(locked_line_handles) = line_handles_arc.lock() {
                     let mut high = 1;
@@ -154,11 +175,14 @@ impl PumpService {
                         high = 0;
                         low = 1;
                     }
-                    log::debug!("Setting pump {} to HIGH={}", pump_job.pump_number, high);
-                    // Force panic if pump value can't be set.
+                    let setting_pump_high_message_data = &json!({ "pump_number": pump_job.pump_number, "value": high });
+                    let setting_pump_high_message = resource_service.render_resource_template_string_by_name("setting_pump_high_info_message_template", setting_pump_high_message_data).unwrap();
+                    log::debug!("{}", setting_pump_high_message);
                     locked_line_handles[index].set_value(high).unwrap();
                     thread::sleep(duration);
-                    log::debug!("Setting pump {} to LOW={}", pump_job.pump_number, low);
+                    let setting_pump_low_message_data = &json!({ "pump_number": pump_job.pump_number, "value": low });
+                    let setting_pump_low_message = resource_service.render_resource_template_string_by_name("setting_pump_low_info_message_template", setting_pump_low_message_data).unwrap();
+                    log::debug!("{}", setting_pump_low_message);
                     locked_line_handles[index].set_value(low).unwrap();
                 }
                 if let Ok(mut locked_pump_states) = pump_states_arc.lock() {
@@ -173,19 +197,24 @@ impl PumpService {
                 // Intermediate checking for daemon killed
                 if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
                     if !*should_run_daemon_guard {
-                        log::debug!("Pump job queue processor daemon killed while processing jobs");
+                        let daemon_killed_while_processing_message = resource_service.get_resource_string_by_name("daemon_killed_while_processing_message").unwrap();
+                        log::debug!("{}", daemon_killed_while_processing_message);
                         return;
                     }
                 }
             }
-            log::debug!("Finished processing pump job queue");
+            let finished_processing_queue_info_message = resource_service.get_resource_string_by_name("finished_processing_queue_info_message").unwrap();
+            log::debug!("{}", finished_processing_queue_info_message);
             if let Ok(should_run_daemon_guard) = should_run_daemon_mutex.lock() {
-                log::debug!("Waiting for \"should run pump queue daemon guard\"");
+                let waiting_message = resource_service.get_resource_string_by_name("waiting_for_should_run_daemon_guard_message").unwrap();
+                log::debug!("{}", waiting_message);
                 let temp_should_run_daemon_guard = cvar.wait(should_run_daemon_guard).unwrap();
                 should_run_daemon = temp_should_run_daemon_guard.clone();
-                log::debug!("Received \"should run pump queue daemon guard\": {}", should_run_daemon);
+                let received_message = resource_service.get_resource_string_by_name("received_for_should_run_daemon_guard_message_template").unwrap();
+                log::debug!("{}{}", received_message, should_run_daemon);
             }
         }
-        log::debug!("Queue processor daemon killed");
+        let daemon_killed_message = resource_service.get_resource_string_by_name("daemon_killed_message").unwrap();
+        log::debug!("{}", daemon_killed_message);
     }
 }

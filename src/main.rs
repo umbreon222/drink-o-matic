@@ -11,7 +11,13 @@ use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
 use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
-use crate::api::{ PumpService, PumpServiceFactory, SettingsService, SettingsServiceFactory };
+use crate::api::{
+    PumpService,
+    PumpServiceFactory,
+    SettingsService,
+    SettingsServiceFactory,
+    ResourceServiceFactory
+};
 
 #[options("/pumps")]
 fn pumps_options() -> () { }
@@ -101,18 +107,17 @@ async fn main() -> Result<(), rocket::Error> {
     // Init dotenv
     dotenv::from_filename("resources/.env").ok();
 
-    // Need to parse this via https://crates.io/crates/strong-xml and pass it in to the services I think.
-    // Idk the best way of passing this in everywhere.
-    let _strings_xml_file_path = dotenv::var("STRINGS_XML_FILE_PATH").unwrap();
+    // Create resource service
+    let resource_service = ResourceServiceFactory::create_or_panic();
 
     // Create pump service
-    let mut pump_service = PumpServiceFactory::create_or_panic();
+    let mut pump_service = PumpServiceFactory::create_or_panic(resource_service.clone());
     let number_of_pumps = pump_service.get_number_of_pumps();
     pump_service.start_daemon();
     let pump_service_arc = Arc::new(Mutex::new(pump_service));
 
     // Create settings service
-    let settings_service = SettingsServiceFactory::create_or_panic(number_of_pumps);
+    let settings_service = SettingsServiceFactory::create_or_panic(resource_service.clone(), number_of_pumps);
 
     let routes = routes![
         pumps_options,
@@ -132,6 +137,7 @@ async fn main() -> Result<(), rocket::Error> {
         .mount("/", routes)
         .manage(pump_service_arc.clone())
         .manage(settings_service)
+        .manage(resource_service)
         .ignite().await?
         .launch().await?;
 

@@ -1,8 +1,7 @@
 use crate::api::models::settings::{ Ingredient, Pump, Drink, Cup };
-use rocket::serde::{ Deserialize, Serialize };
+use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Clone)]
-#[serde(crate = "rocket::serde")]
 pub struct Settings {
     number_of_pumps: u8,
     pub cups: Vec<Cup>,

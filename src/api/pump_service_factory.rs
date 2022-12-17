@@ -5,12 +5,12 @@ use gpio_cdev::{ Chip, LineRequestFlags, LineHandle };
 #[cfg(not(feature = "use-gpio"))]
 use crate::api::mock::{ Chip, LineRequestFlags, LineHandle };
 use crate::api::models::PumpState;
-use crate::PumpService;
+use crate::api::{ ResourceService, PumpService };
 
 pub struct PumpServiceFactory {}
 
 impl PumpServiceFactory {
-    pub fn create_or_panic() -> PumpService {
+    pub fn create_or_panic(resource_service: ResourceService) -> PumpService {
         let is_relay_inverted = dotenv::var("IS_RELAY_INVERTED").unwrap().ends_with('1');
         let ms_per_ml = dotenv::var("MILLISECONDS_PER_ML").unwrap().parse::<u64>().unwrap();
         let rpi_chip_name = dotenv::var("RPI_CHIP_NAME").unwrap();
@@ -20,6 +20,7 @@ impl PumpServiceFactory {
         let initial_pump_states = (1..=pump_pin_numbers.len() as u8).map(|pump_number| PumpState { pump_number, is_running: is_relay_inverted }).collect();
 
         PumpService::new(
+            resource_service,
             is_relay_inverted,
             pump_pin_numbers,
             ms_per_ml,
