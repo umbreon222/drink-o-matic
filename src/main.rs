@@ -10,7 +10,8 @@ use rocket::fairing::{ Info, Fairing, Kind };
 use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
-use crate::api::models::{ PumpState, PumpJob, GenericError, settings::Settings };
+use crate::api::models::{ PumpState, PumpJob, GenericError };
+use crate::api::models::settings::Settings;
 use crate::api::{
     PumpService,
     PumpServiceFactory,
@@ -111,7 +112,8 @@ async fn main() -> Result<(), rocket::Error> {
     env_logger::init();
 
     // Init dotenv
-    dotenv::from_filename("resources/.env").ok();
+    let home_dir = dirs::home_dir().unwrap();
+    dotenv::from_filename(home_dir.join(".drink-o-matic/.env")).ok();
 
     // Create resource service
     let resource_service = ResourceServiceFactory::create_or_panic();
