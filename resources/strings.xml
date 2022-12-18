@@ -4,9 +4,7 @@
     <string name="mocking_gpio_info_message">Feature "use-gpio" was not set; GPIO will be mocked</string>
     <string name="getting_chip_info_message_template">Getting chip "{{chip_name}}"</string>
     <string name="getting_line_handle_info_message_template">Getting line handle for pump {{pump_number}} on pin {{pin_number}}</string>
-    <string name="ml_to_pump_must_be_greater_than_zero_error_message">ml_to_pump must be greater than 0</string>
     <string name="scheduling_pump_info_message_template">Scheduling pump {{pump_number}} to run for {{milliseconds}} ms</string>
-    <string name="starting_process_queue_info_message">Starting to process queue</string>
     <string name="processing_job_info_message_template">Processing job to run pump {{pump_number}} for {{milliseconds}} ms</string>
     <string name="setting_pump_high_info_message_template">Setting pump {{pump_number}} to HIGH={{value}}</string>
     <string name="setting_pump_low_info_message_template">Setting pump {{pump_number}} to LOW={{value}}</string>
@@ -15,9 +13,6 @@
     <string name="ml_to_pump_parse_error_message">Couldn't parse ml to pump</string>
     <string name="invalid_ml_to_pump_error_message">ml to pump must be greater than 0</string>
     <string name="invalid_settings_error_message">Settings are invalid</string>
-    <string name="creating_pump_service_error_message_template">Couldn't create pump service: </string>
-    <string name="creating_settings_service_error_message_template">Couldn't create settings service: </string>
-    <string name="parsing_settings_file_error_message_template">Couldn't parse existing settings: </string>
     <string name="truncating_settings_file_error_message">Couldn't truncate settings file</string>
     <string name="write_to_settings_file_error_message_template">Couldn't write to settings file: </string>
     <string name="create_or_open_settings_file_error_message_template">Couldn't create/open settings file: </string>

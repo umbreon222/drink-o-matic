@@ -52,7 +52,7 @@ impl PumpService {
     }
 
     pub fn pump_number_is_valid(pump_number: u8, number_of_pumps: u8) -> bool {
-        return pump_number > 0 && pump_number <= number_of_pumps;
+        pump_number > 0 && pump_number <= number_of_pumps
     }
     
     pub fn enqueue_pump(&self, pump_number: u8, ml_to_pump: u32) -> Result<Vec<PumpJob>, String> {
