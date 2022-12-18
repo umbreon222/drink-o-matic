@@ -12,6 +12,11 @@ use-gpio = ["dep:gpio-cdev"]
 log = "0.4.0"
 env_logger = "0.8.4"
 dirs = "4.0.0"
+hard-xml = "0.6"
+handlebars = "4.3.5"
+serde = "1.0.151"
+serde_json = "1.0.89"
+dotenv = "0.15.0"
 uuid = { version = "1.1.2", features = ["serde"] }
 rocket = { version = "0.5.0-rc.2", features = ["json"] }
 gpio-cdev = { version = "0.5.1", optional = true }

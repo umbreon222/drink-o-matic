@@ -1,12 +1,11 @@
 use crate::api::models::settings::IngredientMeasurement;
 use uuid::Uuid;
-use rocket::serde::{ Deserialize, Serialize };
+use serde::{ Deserialize, Serialize };
 
 const STAR_RATING_MIN: u8 = 0;
 const STAR_RATING_MAX: u8 = 5;
 
 #[derive(Serialize, Deserialize, Clone)]
-#[serde(crate = "rocket::serde")]
 pub struct Drink {
     pub id: Uuid,
     #[serde(rename  = "imageUrl")]
