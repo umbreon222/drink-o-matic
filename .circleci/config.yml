@@ -11,7 +11,7 @@ jobs:
     steps:
       - checkout
       - run: cargo --version
-      - run: cargo build -r
+      - run: cargo build -r --features bff
       - store_artifacts:
           path: /home/circleci/project/target/release/drink-o-matic
           destination: drink-o-matic
