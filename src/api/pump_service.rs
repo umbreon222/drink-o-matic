@@ -11,7 +11,7 @@ use crate::api::models::{ PumpState, PumpJob };
 use crate::api::ResourceService;
 
 pub struct PumpService {
-    resource_service: ResourceService,
+    resource_service: Arc<ResourceService>,
     is_relay_inverted: bool,
     pump_pin_numbers: Vec<u32>,
     ms_per_ml: u64,
@@ -24,7 +24,7 @@ pub struct PumpService {
 
 impl PumpService {
     pub fn new(
-        resource_service: ResourceService,
+        resource_service: Arc<ResourceService>,
         is_relay_inverted: bool,
         pump_pin_numbers: Vec<u32>,
         ms_per_ml: u64,
@@ -134,7 +134,7 @@ impl PumpService {
     }
 
     fn process_queue(
-        resource_service: ResourceService,
+        resource_service: Arc<ResourceService>,
         is_relay_inverted: bool,
         pump_queue_arc: Arc<Mutex<VecDeque<PumpJob>>>,
         line_handles_arc: Arc<Mutex<Vec<LineHandle>>>,

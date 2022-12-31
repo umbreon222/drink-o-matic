@@ -1,12 +1,12 @@
 use std::fs;
-use std::sync::RwLock;
+use std::sync::{ RwLock, Arc };
 use crate::api::models::settings::Settings;
 use crate::api::{ ResourceService, SettingsService };
 
 pub struct SettingsServiceFactory {}
 
 impl SettingsServiceFactory {
-    pub fn create_or_panic(resource_service: ResourceService, number_of_pumps: u8) -> SettingsService {
+    pub fn create_or_panic(resource_service: Arc<ResourceService>, number_of_pumps: u8) -> SettingsService {
         let home_dir = dirs::home_dir().unwrap();
         let settings_file_path = dotenv::var("SETTINGS_FILE_PATH").unwrap();
         let file_path = home_dir.join(settings_file_path);
@@ -23,7 +23,7 @@ impl SettingsServiceFactory {
         SettingsService::new(
             resource_service,
             RwLock::new(settings),
-            file_path.into_boxed_path()
+            file_path
         )
     }
 }
