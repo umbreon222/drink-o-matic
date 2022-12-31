@@ -1,19 +1,19 @@
-use std::path::Path;
+use std::path::PathBuf;
 use std::fs::OpenOptions;
 use std::fs;
 use std::io::Write;
-use std::sync::RwLock;
+use std::sync::{ Arc, RwLock };
 use crate::api::models::settings::Settings;
 use crate::api::ResourceService;
 
 pub struct SettingsService {
-    resource_service: ResourceService,
+    resource_service: Arc<ResourceService>,
     pub settings: RwLock<Settings>,
-    settings_file_path: Box<Path>
+    settings_file_path: PathBuf
 }
 
 impl SettingsService {
-    pub fn new(resource_service: ResourceService, settings: RwLock<Settings>, settings_file_path: Box<Path>) -> SettingsService {
+    pub fn new(resource_service: Arc<ResourceService>, settings: RwLock<Settings>, settings_file_path: PathBuf) -> SettingsService {
         SettingsService { resource_service, settings, settings_file_path }
     }
 

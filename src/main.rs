@@ -49,7 +49,7 @@ fn pump_number_get(pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u
 }
 
 #[post("/pumps/<pump_number>", data = "<ml_to_pump_input>")]
-fn pump_number_post(resource_service: &State<ResourceService>, pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
+fn pump_number_post(resource_service: &State<Arc<ResourceService>>, pump_service: &State<Arc<Mutex<PumpService>>>, pump_number: u8, ml_to_pump_input: String) -> Result<status::Accepted::<Json<Vec<PumpJob>>>, status::BadRequest::<Json<GenericError>>> {
     let temp = ml_to_pump_input.trim();
     if temp.is_empty() {
         let expected_ml_to_pump_message = resource_service.get_resource_string_by_name("expected_ml_to_pump_error_message").unwrap();
@@ -71,12 +71,12 @@ fn pump_number_post(resource_service: &State<ResourceService>, pump_service: &St
 fn settings_options() -> () { }
 
 #[get("/settings")]
-fn settings_get(settings_service: &State<SettingsService>) -> Json<Settings> {
+fn settings_get(settings_service: &State<Arc<SettingsService>>) -> Json<Settings> {
     Json(settings_service.settings.read().unwrap().clone())
 }
 
 #[put("/settings", format = "application/json", data = "<settings_json>")]
-fn settings_put(resource_service: &State<ResourceService>, settings_service: &State<SettingsService>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
+fn settings_put(resource_service: &State<ResourceService>, settings_service: &State<Arc<SettingsService>>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
     let settings = settings_json.into_inner();
     if !settings.is_valid() {
         let settings_invalid_message = resource_service.get_resource_string_by_name("invalid_settings_error_message").unwrap();
@@ -117,15 +117,17 @@ async fn main() -> Result<(), rocket::Error> {
 
     // Create resource service
     let resource_service = ResourceServiceFactory::create_or_panic();
+    let resource_service_arc = Arc::new(resource_service);
 
     // Create pump service
-    let mut pump_service = PumpServiceFactory::create_or_panic(resource_service.clone());
+    let mut pump_service = PumpServiceFactory::create_or_panic(resource_service_arc.clone());
     let number_of_pumps = pump_service.get_number_of_pumps();
     pump_service.start_daemon();
     let pump_service_arc = Arc::new(Mutex::new(pump_service));
 
     // Create settings service
-    let settings_service = SettingsServiceFactory::create_or_panic(resource_service.clone(), number_of_pumps);
+    let settings_service = SettingsServiceFactory::create_or_panic(resource_service_arc.clone(), number_of_pumps);
+    let settings_service_arc = Arc::new(settings_service);
 
     let routes = routes![
         pumps_options,
@@ -144,8 +146,8 @@ async fn main() -> Result<(), rocket::Error> {
         .attach(CORS)
         .mount("/", routes)
         .manage(pump_service_arc.clone())
-        .manage(settings_service)
-        .manage(resource_service)
+        .manage(settings_service_arc)
+        .manage(resource_service_arc)
         .ignite().await?
         .launch().await?;
 
