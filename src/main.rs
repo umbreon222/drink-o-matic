@@ -151,6 +151,7 @@ async fn main() -> Result<(), rocket::Error> {
     ];
     
     let mut rocket_builder = rocket::build();
+    // Optionally adds my crude back-end for front-end logic
     rocket_builder = optionally_attach_settings_endpoint(rocket_builder, &mut routes, resource_service_arc.clone(), number_of_pumps);
     let _rocket = rocket_builder.attach(CORS)
         .mount("/", routes)
@@ -162,3 +163,4 @@ async fn main() -> Result<(), rocket::Error> {
     pump_service_arc.lock().unwrap().kill_daemon();
     Ok(())
 }
+
