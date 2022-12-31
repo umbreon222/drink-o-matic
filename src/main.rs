@@ -4,19 +4,18 @@ use std::sync::{ Mutex, Arc };
 #[macro_use] extern crate rocket;
 extern crate env_logger;
 use rocket::http::Header;
-use rocket::Response;
-use rocket::Request;
+use rocket::{ Rocket, Response, Request, State, Build, Route };
 use rocket::fairing::{ Info, Fairing, Kind };
-use rocket::State;
 use rocket::response::status;
 use rocket::serde::json::Json;
 use crate::api::models::{ PumpState, PumpJob, GenericError };
+#[cfg(feature = "bff")]
 use crate::api::models::settings::Settings;
+#[cfg(feature = "bff")]
+use crate::api::{ SettingsService, SettingsServiceFactory };
 use crate::api::{
     PumpService,
     PumpServiceFactory,
-    SettingsService,
-    SettingsServiceFactory,
     ResourceService,
     ResourceServiceFactory
 };
@@ -67,14 +66,17 @@ fn pump_number_post(resource_service: &State<Arc<ResourceService>>, pump_service
     }
 }
 
+#[cfg(feature = "bff")]
 #[options("/settings")]
 fn settings_options() -> () { }
 
+#[cfg(feature = "bff")]
 #[get("/settings")]
 fn settings_get(settings_service: &State<Arc<SettingsService>>) -> Json<Settings> {
     Json(settings_service.settings.read().unwrap().clone())
 }
 
+#[cfg(feature = "bff")]
 #[put("/settings", format = "application/json", data = "<settings_json>")]
 fn settings_put(resource_service: &State<ResourceService>, settings_service: &State<Arc<SettingsService>>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
     let settings = settings_json.into_inner();
@@ -106,6 +108,19 @@ impl Fairing for CORS {
     }
 }
 
+#[cfg(feature = "bff")]
+fn optionally_attach_settings_endpoint(rocket_builder: Rocket<Build>, routes: &mut Vec<Route>, resource_service_arc: Arc<ResourceService>, number_of_pumps: u8) -> Rocket<Build> {
+    // Add routes
+    routes.append(&mut routes![settings_options, settings_get, settings_put]);
+    // Create settings service
+    let settings_service = SettingsServiceFactory::create_or_panic(resource_service_arc, number_of_pumps);
+    let settings_service_arc = Arc::new(settings_service);
+    rocket_builder.manage(settings_service_arc)
+}
+
+#[cfg(not(feature = "bff"))]
+fn optionally_attach_settings_endpoint(rocket_builder: Rocket<Build>, _routes: &mut Vec<Route>, _resource_service: Arc<ResourceService>, _number_of_pumps: u8) -> Rocket<Build> { rocket_builder }
+
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
     // Init logger
@@ -125,28 +140,21 @@ async fn main() -> Result<(), rocket::Error> {
     pump_service.start_daemon();
     let pump_service_arc = Arc::new(Mutex::new(pump_service));
 
-    // Create settings service
-    let settings_service = SettingsServiceFactory::create_or_panic(resource_service_arc.clone(), number_of_pumps);
-    let settings_service_arc = Arc::new(settings_service);
-
-    let routes = routes![
+    let mut routes = routes![
         pumps_options,
         pumps_get,
         pump_queue_options,
         pump_queue_get,
         pump_number_options,
         pump_number_get,
-        pump_number_post,
-        settings_options,
-        settings_get,
-        settings_put
+        pump_number_post
     ];
     
-    let _rocket = rocket::build()
-        .attach(CORS)
+    let mut rocket_builder = rocket::build();
+    rocket_builder = optionally_attach_settings_endpoint(rocket_builder, &mut routes, resource_service_arc.clone(), number_of_pumps);
+    let _rocket = rocket_builder.attach(CORS)
         .mount("/", routes)
         .manage(pump_service_arc.clone())
-        .manage(settings_service_arc)
         .manage(resource_service_arc)
         .ignite().await?
         .launch().await?;

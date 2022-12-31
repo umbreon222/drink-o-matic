@@ -1,6 +1,7 @@
 mod pump_state;
 mod pump_job;
 mod generic_error;
+#[cfg(feature = "bff")]
 pub mod settings;
 pub mod resources_xml;
 

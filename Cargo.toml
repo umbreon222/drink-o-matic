@@ -7,6 +7,7 @@ edition = "2018"
 [features]
 default = ["use-gpio"]
 use-gpio = ["dep:gpio-cdev"]
+bff = []
 
 [dependencies]
 log = "0.4.0"
