@@ -163,4 +163,3 @@ async fn main() -> Result<(), rocket::Error> {
     pump_service_arc.lock().unwrap().kill_daemon();
     Ok(())
 }
-
