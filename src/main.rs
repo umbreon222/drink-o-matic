@@ -78,7 +78,7 @@ fn settings_get(settings_service: &State<Arc<SettingsService>>) -> Json<Settings
 
 #[cfg(feature = "bff")]
 #[put("/settings", format = "application/json", data = "<settings_json>")]
-fn settings_put(resource_service: &State<ResourceService>, settings_service: &State<Arc<SettingsService>>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
+fn settings_put(resource_service: &State<Arc<ResourceService>>, settings_service: &State<Arc<SettingsService>>, settings_json: Json<Settings>) -> Result<status::NoContent, status::BadRequest::<Json<GenericError>>> {
     let settings = settings_json.into_inner();
     if !settings.is_valid() {
         let settings_invalid_message = resource_service.get_resource_string_by_name("invalid_settings_error_message").unwrap();
@@ -156,7 +156,7 @@ async fn main() -> Result<(), rocket::Error> {
     let _rocket = rocket_builder.attach(CORS)
         .mount("/", routes)
         .manage(pump_service_arc.clone())
-        .manage(resource_service_arc)
+        .manage(resource_service_arc.clone())
         .ignite().await?
         .launch().await?;
 
