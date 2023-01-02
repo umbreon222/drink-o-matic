@@ -1,6 +1,6 @@
 [package]
 name = "drink-o-matic"
-version = "0.0.1"
+version = "1.0.0"
 authors = ["umbreon222 <umbreon222@gmail.com>"]
 edition = "2018"
 
